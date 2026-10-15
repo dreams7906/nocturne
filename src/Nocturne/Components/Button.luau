@@ -32,9 +32,7 @@ function Button.create(ctx, parent, opts)
 	})
 	Util.corner(root, 6)
 	local stroke = Util.stroke(root, { Transparency = 0.05 })
-	ctx:RegisterGloss(Util.gloss(root, 0.14))
-	local sheen = Util.sheen(root, 6, 0.9)
-	ctx:RegisterGloss(sheen)
+	ctx:RegisterGloss(Util.gloss(root, 0.035))
 	local scale = Util.new("UIScale", { Parent = root })
 
 	local content = Util.frame({

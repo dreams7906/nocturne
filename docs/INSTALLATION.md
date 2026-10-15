@@ -22,7 +22,7 @@ The bundle includes every module, so no ModuleScript installation is needed for 
 1. In **ReplicatedStorage**, insert a **ModuleScript** named `Nocturne` and paste in all of `Nocturne.lua`.
 2. In **StarterPlayer › StarterPlayerScripts**, insert a **LocalScript** and paste in `Example.lua`, or your own script that uses the library.
 3. Optional: in **ServerScriptService**, insert a **Script** and paste in `server/ConfigPersistence.server.lua` for per-player config saves.
-4. Press **Play**. The dock appears at the top centre, and **Right Ctrl** toggles the window.
+4. Press **Play**. Click dock icons to open independent category windows. **Right Ctrl** hides or restores the entire interface, including the dock, while preserving window positions.
 
 To test DataStore saves in Studio, enable *Game Settings › Security › Enable Studio Access to API Services*.
 
@@ -46,5 +46,5 @@ This also regenerates `RemoteExample.lua` from `Example.lua`. Upload both genera
 
 ## Requirements
 
-- Roblox Studio (any current version). The library uses only standard engine APIs: TweenService, UserInputService, CanvasGroup, UIStroke, UIGradient and Font objects. It has no external dependencies and no uploaded assets.
+- Roblox Studio (any current version). The library uses standard engine APIs. Icon image IDs are already included, so no manual image installation is needed. While Roblox processes a new image, or if it cannot load, the matching drawn icon remains visible.
 - Python 3.9+ is needed only for the build, asset and test tools.

@@ -102,7 +102,7 @@ function Watermark.new(ctx, opts)
 	self._divider4 = divider(self._top, 8)
 	self.Name = segment(self._top, 9, false, "TextDim")
 	local player = Players.LocalPlayer
-	self.Name.Text = player and player.DisplayName or "Player"
+	self.Name.Text = opts.PrivacyMode and "User" or (player and player.DisplayName or "Player")
 
 	self._frames, self._elapsed, self._fps = 0, 0, 60
 	return self

@@ -215,6 +215,7 @@ __modules["Nocturne.App"] = function(script, require)
 			Name = name,
 			IgnoreGuiInset = true,
 			ResetOnSpawn = false,
+			Enabled = true,
 			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 			DisplayOrder = options.DisplayOrder or 50,
 			Parent = parent,
@@ -275,6 +276,9 @@ __modules["Nocturne.App"] = function(script, require)
 			Keybinds = ctx.Keybinds,
 			Notifications = notifications,
 			Pages = {},
+			Windows = {},
+			_windowOptions = options,
+			PrivacyMode = options.PrivacyMode == true,
 			UserScale = options.Scale or 1,
 			BlurEnabled = options.Blur == true,
 			CollapseOnReselect = options.CollapseOnReselect ~= false,
@@ -288,24 +292,17 @@ __modules["Nocturne.App"] = function(script, require)
 			return self.Toolbar:Bottom()
 		end
 		self.Window = Window.new(ctx, options)
+		self:_attachWindow(self.Window)
 		self.Watermark = Watermark.new(ctx, options)
 		self.KeybindList = KeybindList.new(ctx)
 		self.Configs = ConfigManager.new(ctx.State)
+		gui.Destroying:Once(function()
+			self:Destroy()
+		end)
 
 		self.Toolbar.Clicked:Connect(function(page)
 			self:_fromToolbar(page)
 		end)
-		self.Window.PageChanged:Connect(function(page)
-			if self.Window.IsOpen then
-				self.Toolbar:SetActive(page)
-			end
-		end)
-		self.Window.Closed:Connect(function()
-			self.Toolbar:SetActive(nil)
-			self:_applyBlur(false)
-			self.Closed:Fire()
-		end)
-
 		self._menuBind = ctx.Keybinds:Register({
 			Name = "Menu",
 			Key = options.MenuKey and (typeof(options.MenuKey) == "EnumItem" and options.MenuKey.Name or options.MenuKey)
@@ -330,14 +327,55 @@ __modules["Nocturne.App"] = function(script, require)
 	-- Navigation ----------------------------------------------------------------
 
 	function App:Page(opts)
-		local page = Page.new(self.ctx, self.Window.PageHolder, opts)
-		table.insert(self.Pages, page)
-		self.Window:AddPage(page)
-		self.Toolbar:AddItem(page)
-		if #self.Pages == 1 then
-			self.Window:Select(page, true)
+		local window = self.Windows[1]
+		if #self.Pages > 0 then
+			local options = table.clone(self._windowOptions)
+			options.Subtitle = opts.Name
+			options.PrivacyMode = self.PrivacyMode
+			window = Window.new(self.ctx, options)
+			self:_attachWindow(window)
+			window:SetScale(self.ctx:GetScale())
 		end
+		local page = Page.new(self.ctx, window.PageHolder, opts)
+		page.Window = window
+		table.insert(self.Pages, page)
+		window:AddPage(page)
+		self.Toolbar:AddItem(page)
+		window:Select(page, true)
 		return page
+	end
+
+	function App:_attachWindow(window)
+		table.insert(self.Windows, window)
+		window.Index = #self.Windows
+		window.Focused:Connect(function()
+			self:_focusWindow(window)
+		end)
+		window.Closed:Connect(function()
+			self:_refreshDock()
+			self:_applyBlur(self:IsOpen())
+			self.Closed:Fire()
+		end)
+	end
+
+	function App:_focusWindow(window)
+		self.Window = window
+		-- Keep the focused window above its siblings without overtaking the dock.
+		for _, sibling in ipairs(self.Windows) do
+			sibling.Holder.ZIndex = sibling == window and 12 or 10
+		end
+		self:_refreshDock()
+	end
+
+	function App:_refreshDock()
+		local opened = {}
+		for _, window in ipairs(self.Windows) do
+			if window.IsOpen and window.Current then
+				opened[window.Current] = true
+			end
+		end
+		self.Toolbar:SetOpenPages(opened)
+		self.Toolbar:SetActive(self.Window.IsOpen and self.Window.Current or nil)
 	end
 
 	function App:GetPage(name)
@@ -350,54 +388,65 @@ __modules["Nocturne.App"] = function(script, require)
 	end
 
 	function App:_fromToolbar(page)
-		local window = self.Window
-		if window.IsOpen and window.Current == page and not window.Minimized then
+		local window = page.Window
+		if window.IsOpen and not window.Minimized then
 			if self.CollapseOnReselect then
-				self:Close()
+				window:Close()
 			end
 			return
 		end
 		if window.Minimized then
 			window:SetMinimized(false)
 		end
-		window:Select(page)
+		self:_focusWindow(window)
 		self:Open()
 	end
 
 	function App:SelectPage(name)
 		local page = type(name) == "table" and name or self:GetPage(name)
 		if page then
-			self.Window:Select(page)
+			self:_focusWindow(page.Window)
+			page.Window:Select(page)
 		end
 	end
 
 	function App:Open(pageName)
+		self.Gui.Enabled = true
 		if pageName then
 			self:SelectPage(pageName)
 		end
-		if self.Window.IsOpen then
-			return
-		end
 		self.Window:Open()
-		self.Toolbar:SetActive(self.Window.Current)
+		self:_refreshDock()
 		self:_applyBlur(true)
 		self.Opened:Fire()
 	end
 
 	function App:Close()
-		self.Window:Close()
+		self.Gui.Enabled = false
+		self.ctx.Popups:CloseAll()
+		self.ctx.Tooltip:Hide()
+		self:_applyBlur(false)
 	end
 
 	function App:Toggle()
-		if self.Window.IsOpen then
+		if self.Gui.Enabled then
 			self:Close()
 		else
-			self:Open()
+			self.Gui.Enabled = true
+			if not self:IsOpen() then
+				self:Open()
+			else
+				self:_applyBlur(true)
+			end
 		end
 	end
 
 	function App:IsOpen()
-		return self.Window.IsOpen
+		if not self.Gui.Enabled then return false end
+		for _, window in ipairs(self.Windows) do
+			if window.IsOpen then return true end
+		end
+		return false
 	end
 
 	function App:Notify(opts)
@@ -442,17 +491,34 @@ __modules["Nocturne.App"] = function(script, require)
 		self:_applyScale()
 	end
 
+	function App:SetPrivacyMode(enabled)
+		self.PrivacyMode = enabled == true
+		for _, window in ipairs(self.Windows) do
+			window:SetPrivacyMode(self.PrivacyMode)
+		end
+		local player = Players.LocalPlayer
+		self.Watermark.Name.Text = self.PrivacyMode and "User" or (player and player.DisplayName or "Player")
+		self.Watermark:_resize()
+	end
+
 	-- Fits the window on small screens (phones) on top of the user's choice.
 	function App:_applyScale()
 		local viewport = self.Gui.AbsoluteSize
 		if viewport.X <= 0 or viewport.Y <= 0 then
 			return
 		end
-		local fit = math.min((viewport.X - 32) / Window.Width, (viewport.Y - 96) / Window.Height, 1)
-		local scale = self.UserScale * math.clamp(fit, 0.45, 1)
+		local width, height = Window.Width, Window.Height
+		for _, window in ipairs(self.Windows) do
+			width = math.max(width, window.Width)
+			height = math.max(height, window.Height)
+		end
+		local fit = math.min((viewport.X - 32) / width, (viewport.Y - 96) / height)
+		local scale = math.max(0.1, math.min(self.UserScale, fit))
 		local chrome = self.UserScale * math.clamp(viewport.X / 520, 0.7, 1)
 		self.ctx._scale = scale
-		self.Window:SetScale(scale)
+		for _, window in ipairs(self.Windows) do
+			window:SetScale(scale)
+		end
 		self.Toolbar:SetScale(chrome)
 		self.Notifications:SetScale(chrome)
 		self.Watermark:SetScale(chrome)
@@ -462,7 +528,7 @@ __modules["Nocturne.App"] = function(script, require)
 
 	function App:SetBlur(enabled)
 		self.BlurEnabled = enabled
-		self:_applyBlur(enabled and self.Window.IsOpen)
+		self:_applyBlur(enabled and self:IsOpen())
 	end
 
 	function App:_applyBlur(on)
@@ -481,7 +547,7 @@ __modules["Nocturne.App"] = function(script, require)
 			Motion.tween(blur, "Smooth", { Size = 12 })
 		elseif blur then
 			Motion.tween(blur, "Normal", { Size = 0 }, function()
-				if self._blur == blur and not (self.BlurEnabled and self.Window.IsOpen) then
+				if self._blur == blur and not (self.BlurEnabled and self:IsOpen()) then
 					blur:Destroy()
 					self._blur = nil
 				end
@@ -533,19 +599,28 @@ __modules["Nocturne.App"] = function(script, require)
 	end
 
 	function App:ResetPosition()
-		self.Window:Center()
+		for _, window in ipairs(self.Windows) do
+			window:Center()
+		end
 	end
 
 	function App:Destroy()
+		if self._destroyed then return end
+		self._destroyed = true
 		for _, connection in ipairs(self._connections) do
 			connection:Disconnect()
 		end
 		self.ctx.Keybinds:Destroy()
 		self.ctx.Popups:Destroy()
+		for _, window in ipairs(self.Windows) do
+			window:Destroy()
+		end
 		if self._blur then
 			self._blur:Destroy()
 		end
 		self.Gui:Destroy()
+		self.Opened:Destroy()
+		self.Closed:Destroy()
 	end
 
 	return Nocturne
@@ -730,7 +805,7 @@ __modules["Nocturne.Builtins.SettingsTab"] = function(script, require)
 			Text = "Window transparency",
 			Min = 0,
 			Max = 40,
-			Default = 4,
+			Default = 16,
 			Suffix = "%",
 			Flag = "UI.Transparency",
 			Callback = function(v)
@@ -761,6 +836,13 @@ __modules["Nocturne.Builtins.SettingsTab"] = function(script, require)
 		})
 
 		local interface = page:Section({ Title = "Interface" })
+		interface:Switch({
+			Text = "Hide username & avatar",
+			Default = app.PrivacyMode,
+			Flag = "UI.PrivacyMode",
+			Tooltip = "Use a person icon and the name User in all windows and the watermark.",
+			Callback = function(enabled) app:SetPrivacyMode(enabled) end,
+		})
 		interface:Slider({
 			Text = "UI scale",
 			Min = 70,
@@ -777,7 +859,7 @@ __modules["Nocturne.Builtins.SettingsTab"] = function(script, require)
 			Text = "Menu key",
 			Bind = app:GetMenuBind(),
 			Flag = "UI.MenuKey",
-			Tooltip = "Toggles the window. Backspace can't clear this one.",
+			Tooltip = "Hides or restores every window and the dock. Backspace can't clear this one.",
 		})
 		interface:Switch({
 			Text = "Tooltips",
@@ -791,13 +873,13 @@ __modules["Nocturne.Builtins.SettingsTab"] = function(script, require)
 			Text = "Collapse on reselect",
 			Default = true,
 			Flag = "UI.CollapseOnReselect",
-			Tooltip = "Clicking the active dock icon again closes the window.",
+			Tooltip = "Clicking an open dock icon again closes only its window.",
 			Callback = function(v)
 				app.CollapseOnReselect = v
 			end,
 		})
 		interface:Button({
-			Text = "Re-centre window",
+			Text = "Re-centre windows",
 			Callback = function()
 				app:ResetPosition()
 			end,
@@ -1096,9 +1178,7 @@ __modules["Nocturne.Components.Button"] = function(script, require)
 		})
 		Util.corner(root, 6)
 		local stroke = Util.stroke(root, { Transparency = 0.05 })
-		ctx:RegisterGloss(Util.gloss(root, 0.14))
-		local sheen = Util.sheen(root, 6, 0.9)
-		ctx:RegisterGloss(sheen)
+		ctx:RegisterGloss(Util.gloss(root, 0.035))
 		local scale = Util.new("UIScale", { Parent = root })
 
 		local content = Util.frame({
@@ -1336,6 +1416,7 @@ __modules["Nocturne.Components.ColorPicker"] = function(script, require)
 			Util.corner(black, 6)
 			Util.new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(1, 0), Parent = black })
 			local svCursor = Util.frame({
+				Name = "Cursor",
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Size = UDim2.fromOffset(10, 10),
 				ZIndex = 5,
@@ -1356,6 +1437,7 @@ __modules["Nocturne.Components.ColorPicker"] = function(script, require)
 			Util.corner(hueBar, UDim.new(1, 0))
 			Util.new("UIGradient", { Color = hueSequence(), Parent = hueBar })
 			local hueCursor = Util.frame({
+				Name = "Cursor",
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Size = UDim2.fromOffset(6, 14),
 				BackgroundTransparency = 0,
@@ -1454,12 +1536,17 @@ __modules["Nocturne.Components.ColorPicker"] = function(script, require)
 			}
 
 			local function updateFrom(point)
+				if not open then
+					return
+				end
 				if dragging == "sv" then
 					local position, size = sv.AbsolutePosition, sv.AbsoluteSize
+					if size.X <= 0 or size.Y <= 0 then return end
 					sat = math.clamp((point.X - position.X) / size.X, 0, 1)
 					val = 1 - math.clamp((point.Y - position.Y) / size.Y, 0, 1)
 				elseif dragging == "hue" then
 					local position, size = hueBar.AbsolutePosition, hueBar.AbsoluteSize
+					if size.X <= 0 then return end
 					hue = math.clamp((point.X - position.X) / size.X, 0, 0.999)
 				end
 				commit(false)
@@ -1514,19 +1601,19 @@ __modules["Nocturne.Components.ColorPicker"] = function(script, require)
 			end
 			open = true
 			ctx.Popups:Open(popup.Handle)
-			local scale = ctx:GetScale()
-			local holder = popup.Surface.Holder
-			local position, size = root.AbsolutePosition, root.AbsoluteSize
 			local viewport = ctx.Gui.AbsoluteSize
+			local scale = math.min(ctx:GetScale(), (viewport.X - 16) / WIDTH, (viewport.Y - 16) / HEIGHT)
+			local holder = popup.Surface.Holder
+			local position = root.AbsolutePosition - ctx.Overlay.AbsolutePosition
+			local size = root.AbsoluteSize
 			local below = position.Y + size.Y + 6 + HEIGHT * scale <= viewport.Y - 8
-			local x = math.clamp(position.X + size.X - WIDTH * scale, 8, viewport.X - WIDTH * scale - 8)
+			local x = math.clamp(position.X + size.X - WIDTH * scale, 8, math.max(8, viewport.X - WIDTH * scale - 8))
 			popup.Scale.Scale = scale
 			holder.AnchorPoint = Vector2.new(0, below and 0 or 1)
-			local y = below and (position.Y + size.Y + 6) or (position.Y - 6)
-			holder.Position = UDim2.fromOffset(x, y + (below and -6 or 6))
+			local y = below and (position.Y + size.Y + 6) or math.max(HEIGHT * scale + 8, position.Y - 6)
+			holder.Position = UDim2.fromOffset(x, y)
 			holder.Visible = true
 			popup.Surface.Body.GroupTransparency = 1
-			Motion.tween(holder, "Normal", { Position = UDim2.fromOffset(x, y) })
 			popup.Surface.SetAlpha(0, "Normal")
 			commit(true)
 		end
@@ -1872,7 +1959,7 @@ __modules["Nocturne.Components.Dropdown"] = function(script, require)
 			local selected = isSelected(entry.option)
 			local preset = instant and "Instant" or "Fast"
 			Motion.tween(entry.button, preset, {
-				BackgroundColor3 = selected and t.AccentSoft or t.Hover,
+				BackgroundColor3 = selected and t.Hover:Lerp(t.Text, 0.12) or t.Hover,
 				BackgroundTransparency = selected and 0 or (entry.hovered and 0 or 1),
 			})
 			Motion.tween(entry.label, preset, {
@@ -1997,7 +2084,7 @@ __modules["Nocturne.Components.Dropdown"] = function(script, require)
 			local holder = popup.Surface.Holder
 			local height = listHeight()
 			local width = field.AbsoluteSize.X / scale
-			local fieldPos = field.AbsolutePosition
+			local fieldPos = field.AbsolutePosition - ctx.Overlay.AbsolutePosition
 			local viewport = ctx.Gui.AbsoluteSize
 			local below = fieldPos.Y + field.AbsoluteSize.Y + 4 + height * scale <= viewport.Y - 8
 
@@ -2950,25 +3037,37 @@ __modules["Nocturne.Components.Section"] = function(script, require)
 			LayoutOrder = order,
 			Parent = parent,
 		})
-		Util.corner(frame, 8)
-		local stroke = Util.stroke(frame, { Transparency = 0.05 })
-		theme:Bind(frame, { BackgroundColor3 = "Surface" })
-		theme:Bind(stroke, { Color = "Border" })
-		ctx:RegisterGloss(Util.gloss(frame, 0.07))
-		ctx:RegisterGloss(Util.sheen(frame, 10, 0.94))
+		Util.corner(frame, 10)
+		Util.glassStroke(ctx, frame, "BorderStrong", 0.56)
+		theme:Bind(frame, { BackgroundColor3 = "Surface", BackgroundTransparency = function(t) return 0.08 + t.Transparency * 0.5 end })
+		ctx:RegisterGloss(Util.gloss(frame, 0.12))
 		Util.list(frame, {})
+		if opts.Title and opts.Tabs then
+			local titleRow = Util.frame({ Name = "Title", Size = UDim2.new(1, 0, 0, 28), LayoutOrder = 0, Parent = frame })
+			local title = Util.text({
+				Text = opts.Title, FontFace = Util.Fonts.Bold, TextSize = 12,
+				Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -24, 1, -4), Parent = titleRow,
+			})
+			theme:Bind(title, { TextColor3 = "Text" })
+		end
 
-		local header = Util.frame({
+		local header = Util.new("ScrollingFrame", {
 			Name = "Header",
 			Size = UDim2.new(1, 0, 0, 34),
 			LayoutOrder = 1,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScrollBarThickness = 0,
+			ScrollingDirection = Enum.ScrollingDirection.X,
+			AutomaticCanvasSize = Enum.AutomaticSize.X,
+			CanvasSize = UDim2.new(),
 			Parent = frame,
 		})
 		Util.padding(header, 0, 12)
 		Util.list(header, {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Padding = 14,
+			Padding = 5,
 		})
 
 		local divider = Util.frame({
@@ -2987,6 +3086,7 @@ __modules["Nocturne.Components.Section"] = function(script, require)
 		local tabNames = opts.Tabs or { opts.Title or "Section" }
 		local bodies, containers, buttons = {}, {}, {}
 		local active
+		local count = 0
 
 		local function renderTabs(instant)
 			local t = theme.Tokens
@@ -2994,12 +3094,15 @@ __modules["Nocturne.Components.Section"] = function(script, require)
 				local isActive = name == active
 				Motion.tween(button, instant and "Instant" or "Fast", {
 					TextColor3 = isActive and t.Text or (button:GetAttribute("Hovered") and t.TextDim or t.TextMuted),
+					BackgroundColor3 = t.Text,
+					BackgroundTransparency = count > 1 and (isActive and 0.89 or (button:GetAttribute("Hovered") and 0.96 or 1)) or 1,
 				})
 				button.FontFace = isActive and Util.Fonts.Bold or Util.Fonts.SemiBold
 			end
 		end
 
 		local function select(name)
+			if not bodies[name] then return end
 			if active == name then
 				return
 			end
@@ -3010,20 +3113,25 @@ __modules["Nocturne.Components.Section"] = function(script, require)
 			renderTabs(false)
 		end
 
-		for index, name in ipairs(tabNames) do
-			local isTabbed = opts.Tabs ~= nil
-			local button = Util.new(isTabbed and "TextButton" or "TextLabel", {
+		local addTab
+		addTab = function(name)
+			if containers[name] then return containers[name] end
+			count += 1
+			local index = count
+			local button = Util.button({
 				Name = name,
 				Text = name,
 				BackgroundTransparency = 1,
 				FontFace = Util.Fonts.Bold,
 				TextSize = 12,
 				AutomaticSize = Enum.AutomaticSize.X,
-				Size = UDim2.fromScale(0, 1),
+				Size = UDim2.fromOffset(0, 24),
 				LayoutOrder = index,
 				Parent = header,
 			})
-			if isTabbed then
+			Util.corner(button, 6)
+			Util.padding(button, 0, 8)
+			do
 				button.AutoButtonColor = false
 				button.Activated:Connect(function()
 					select(name)
@@ -3051,20 +3159,23 @@ __modules["Nocturne.Components.Section"] = function(script, require)
 			Util.list(body, { Padding = 2 })
 			bodies[name] = body
 			containers[name] = Container.new(ctx, body)
+			local container = containers[name]
+			container.Section = frame
+			function container:Tab(tabName) return containers[tabName] end
+			function container:AddTab(tabName) return addTab(tabName) end
+			function container:SelectTab(tabName) select(tabName) end
+			if not active then active = name end
+			renderTabs(true)
+			return container
+		end
+		for _, name in ipairs(tabNames) do
+			addTab(name)
 		end
 		active = tabNames[1]
 		theme.Changed:Connect(renderTabs)
 		renderTabs(true)
 
-		local section = containers[tabNames[1]]
-		section.Section = frame
-		function section:Tab(name)
-			return containers[name]
-		end
-		function section:SelectTab(name)
-			select(name)
-		end
-		return section
+		return containers[tabNames[1]]
 	end
 
 	return Section
@@ -3313,21 +3424,20 @@ __modules["Nocturne.Components.Toggle"] = function(script, require)
 	local Signal = require(script.Parent.Parent.Core.Signal)
 	local Maid = require(script.Parent.Parent.Core.Maid)
 	local Motion = require(script.Parent.Parent.Animations.Motion)
-	local Icons = require(script.Parent.Parent.Icons.Icons)
 
 	return function(container, opts)
 		local ctx = container.ctx
 		local theme = ctx.Theme
 		local isSwitch = opts.Style == "Switch"
 
-		local row = container:Row(26)
+		local row = container:Row(24)
 		local maid = Maid.new():LinkTo(row)
 		local value = opts.Default == true
 		local hovered = false
 
 		local hit = Util.button({ Name = "Hit", Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = row })
 
-		local box, fill, check, glow, knob
+		local box, fill, knob
 		if isSwitch then
 			box = Util.frame({
 				Name = "Track",
@@ -3350,26 +3460,16 @@ __modules["Nocturne.Components.Toggle"] = function(script, require)
 			})
 			Util.corner(knob, UDim.new(1, 0))
 		else
-			glow = Util.frame({
-				Name = "Glow",
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(0, 7, 0.5, 0),
-				Size = UDim2.fromOffset(22, 22),
-				BackgroundTransparency = 1,
-				ZIndex = 1,
-				Parent = row,
-			})
-			Util.corner(glow, 8)
 			box = Util.frame({
 				Name = "Box",
 				AnchorPoint = Vector2.new(0, 0.5),
 				Position = UDim2.new(0, 0, 0.5, 0),
-				Size = UDim2.fromOffset(14, 14),
+				Size = UDim2.fromOffset(18, 18),
 				BackgroundTransparency = 0,
 				ZIndex = 2,
 				Parent = row,
 			})
-			Util.corner(box, 4)
+			Util.corner(box, 5)
 			fill = Util.frame({
 				Name = "Fill",
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -3379,16 +3479,7 @@ __modules["Nocturne.Components.Toggle"] = function(script, require)
 				ZIndex = 3,
 				Parent = box,
 			})
-			Util.corner(fill, 4)
-			Util.gloss(fill, 0.18)
-			check = Icons.create("check", 12, Color3.new(), {
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Transparency = 1,
-				ZIndex = 4,
-				Thickness = 1.6,
-				Parent = box,
-			})
+			Util.corner(fill, 5)
 		end
 		local stroke = Util.stroke(box, { Transparency = 0.1 })
 
@@ -3426,7 +3517,7 @@ __modules["Nocturne.Components.Toggle"] = function(script, require)
 			Motion.tween(label, preset, { TextColor3 = (value or hovered) and t.Text or t.TextDim })
 			if isSwitch then
 				Motion.tween(box, preset, { BackgroundColor3 = value and t.Accent or (hovered and t.Hover or t.Surface2) })
-				Motion.tween(stroke, preset, { Color = value and t.Accent or t.BorderStrong })
+				Motion.tween(stroke, preset, { Color = value and t.Accent or t.BorderStrong, Transparency = value and 0.2 or 0.5 })
 				Motion.tween(knob, instant and "Instant" or "Normal", {
 					Position = UDim2.new(0, value and 14 or 2, 0.5, 0),
 					BackgroundColor3 = value and t.AccentText or t.TextDim,
@@ -3438,11 +3529,6 @@ __modules["Nocturne.Components.Toggle"] = function(script, require)
 					Size = value and UDim2.fromScale(1, 1) or UDim2.fromScale(0, 0),
 					BackgroundColor3 = t.Accent,
 				})
-				Motion.tween(glow, preset, {
-					BackgroundColor3 = t.Accent,
-					BackgroundTransparency = value and 0.86 or 1,
-				})
-				Icons.tween(check, preset, t.AccentText, value and 0 or 1)
 			end
 		end
 
@@ -3623,7 +3709,7 @@ __modules["Nocturne.Components.Tooltip"] = function(script, require)
 				end
 				local viewport = self.ctx.Gui.AbsoluteSize
 				local size = frame.AbsoluteSize
-				local position = target.AbsolutePosition
+				local position = target.AbsolutePosition - self.ctx.Overlay.AbsolutePosition
 				local targetSize = target.AbsoluteSize
 				local x = position.X + targetSize.X + 8
 				local y = position.Y + targetSize.Y / 2 - size.Y / 2
@@ -4543,22 +4629,28 @@ __modules["Nocturne.Core.Util"] = function(script, require)
 	-- Stroke that is brighter on the top edge than on the bottom edge.
 	function Util.glassStroke(ctx, parent, token, transparency)
 		local stroke = Util.stroke(parent, { Transparency = transparency or 0 })
-		ctx.Theme:Bind(stroke, { Color = token or "BorderStrong" })
+		ctx.Theme:Bind(stroke, { Color = function(tokens)
+			return tokens[token or "BorderStrong"]:Lerp(Color3.new(1, 1, 1), 0.68)
+		end })
 		Util.new("UIGradient", {
 			Rotation = 90,
-			Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(0.62, 0.62, 0.62)),
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.05),
+				NumberSequenceKeypoint.new(0.45, 0.62),
+				NumberSequenceKeypoint.new(1, 0.18),
+			}),
 			Parent = stroke,
 		})
 		return stroke
 	end
 
-	-- Converts an InputObject position to ScreenGui space (IgnoreGuiInset = true).
+	-- InputObject.Position and GuiObject.AbsolutePosition both account for the inset.
 	function Util.pointer(input)
-		local inset = GuiService:GetGuiInset()
 		if input then
-			return Vector2.new(input.Position.X, input.Position.Y) + inset
+			return Vector2.new(input.Position.X, input.Position.Y)
 		end
-		return UserInputService:GetMouseLocation()
+		local inset = GuiService:GetGuiInset()
+		return UserInputService:GetMouseLocation() - inset
 	end
 
 	function Util.contains(guiObject, point, margin)
@@ -4667,6 +4759,22 @@ __modules["Nocturne.Core.Util"] = function(script, require)
 		ctx.Theme:Bind(fill, fillMap)
 		local gloss = Util.gloss(fill, opts.GlossStrength or 0.12)
 		ctx:RegisterGloss(gloss)
+		local reflection = Util.frame({
+			Name = "Reflection", Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0,
+			ZIndex = 1, Parent = body,
+		})
+		Util.corner(reflection, radius)
+		Util.new("UIGradient", {
+			Rotation = 115,
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.91),
+				NumberSequenceKeypoint.new(0.35, 0.98),
+				NumberSequenceKeypoint.new(0.65, 1),
+				NumberSequenceKeypoint.new(1, 0.97),
+			}), Parent = reflection,
+		})
+		ctx:RegisterGloss(reflection)
 
 		-- Inner edge: a frame inset by 1px whose outside stroke lands exactly on
 		-- the body's outermost pixel, so it survives CanvasGroup clipping.
@@ -4678,7 +4786,13 @@ __modules["Nocturne.Core.Util"] = function(script, require)
 			Parent = body,
 		})
 		Util.corner(edge, math.max(radius - 1, 0))
-		Util.glassStroke(ctx, edge, opts.EdgeToken or "BorderStrong", opts.EdgeTransparency or 0.15)
+		Util.glassStroke(ctx, edge, opts.EdgeToken or "BorderStrong", opts.EdgeTransparency or 0.4)
+		local rim = Util.frame({
+			Name = "RimLight", Size = UDim2.new(1, 2, 1, 2), Position = UDim2.fromOffset(-1, -1),
+			ZIndex = 2, Parent = holder,
+		})
+		Util.corner(rim, radius + 1)
+		local rimStroke = Util.stroke(rim, { Color = Color3.new(1, 1, 1), Transparency = 0.94, Thickness = 3 })
 
 		local sheen = Util.sheen(body, radius + 4, 0.88)
 		sheen.ZIndex = 51
@@ -4694,6 +4808,7 @@ __modules["Nocturne.Core.Util"] = function(script, require)
 
 		function surface.SetAlpha(alpha, preset)
 			Motion.tween(body, preset or "Normal", { GroupTransparency = alpha })
+			Motion.tween(rimStroke, preset or "Normal", { Transparency = 1 - 0.06 * (1 - alpha) })
 			for _, shadow in ipairs(shadows) do
 				local target = 1 - (1 - shadowAlpha) * (1 - alpha)
 				Motion.tween(shadow, preset or "Normal", { BackgroundTransparency = target })
@@ -4706,12 +4821,38 @@ __modules["Nocturne.Core.Util"] = function(script, require)
 	return Util
 end
 
+__node("Nocturne.Icons.Assets")
+__modules["Nocturne.Icons.Assets"] = function(script, require)
+	-- Generated by tools/build_icon_assets.py from assets/generated-icons/manifest.json.
+	local Assets = {}
+	Assets.nocturne = { Image = "rbxassetid://94383796334112" }
+	Assets.combat = { Image = "rbxassetid://133149767794003" }
+	Assets.visuals = { Image = "rbxassetid://133395560601361" }
+	Assets.world = { Image = "rbxassetid://137930732018683" }
+	Assets.player = { Image = "rbxassetid://132978357840863" }
+	Assets.settings = { Image = "rbxassetid://135452470649058" }
+	Assets.configs = { Image = "rbxassetid://132227538337264" }
+	Assets.utilities = { Image = "rbxassetid://132705411270408" }
+	Assets.misc = { Image = "rbxassetid://71432307544650" }
+	local sheet = "rbxassetid://102937966099946"
+	local size = Vector2.new(1402, 1122)
+	local cell = Vector2.new(size.X / 5, size.Y / 4)
+	for index, name in ipairs({ "resize", "chevron", "check", "close", "minimize", "maximize", "search", "keyboard", "save", "load", "trash", "pencil", "plus", "copy", "bell", "info", "warning", "success", "palette", "sparkle" }) do
+		Assets[name] = {
+			Image = sheet,
+			RectOffset = Vector2.new((index - 1) % 5 * cell.X, math.floor((index - 1) / 5) * cell.Y),
+			RectSize = cell, SheetSize = size,
+		}
+	end
+	return Assets
+end
+
 __node("Nocturne.Icons.Icons")
 __modules["Nocturne.Icons.Icons"] = function(script, require)
 	--[[
 		Icons
-		Line icons drawn with native GUI primitives on an 18x18 grid, so they
-		scale crisply, tint with the theme and need no uploaded image assets.
+		Uploaded icons with theme tinting and native 18x18 loading fallbacks.
+		The fallback is removed before the uploaded image becomes visible.
 
 		Shapes
 			{"line", x1, y1, x2, y2}           stroked segment with round caps
@@ -4725,58 +4866,120 @@ __modules["Nocturne.Icons.Icons"] = function(script, require)
 	]]
 
 	local Motion = require(script.Parent.Parent.Animations.Motion)
+	local Assets = require(script.Parent.Assets)
+	local RunService = game:GetService("RunService")
+	local ContentProvider = game:GetService("ContentProvider")
 
 	local Icons = {}
+	Icons.Assets = Assets
 
 	local GRID = 18
+	local pending = {}
+	local loaderConnection
+	local requested = {}
+
+	local function preload(image)
+		if requested[image] then return end
+		requested[image] = true
+		task.defer(function()
+			pcall(function() ContentProvider:PreloadAsync({ image }) end)
+		end)
+	end
+
+	local function watchImage(icon, refresh)
+		pending[icon] = refresh
+		icon.Destroying:Once(function() pending[icon] = nil end)
+		if loaderConnection then return end
+		local elapsed = 0
+		loaderConnection = RunService.Heartbeat:Connect(function(dt)
+			elapsed += dt
+			if elapsed < 0.1 then return end
+			elapsed = 0
+			for image, update in pairs(pending) do
+				if update() then
+					pending[image] = nil
+				end
+			end
+			if not next(pending) then
+				loaderConnection:Disconnect()
+				loaderConnection = nil
+			end
+		end)
+	end
 
 	Icons.Glyphs = {
+		nocturne = {
+			{"arc", 8, 9, 7, 65, 295},
+			{"arc", 10.96, 9, 6.34, 90, 270},
+			{"line", 13.5, 1.8, 13.5, 6.2},
+			{"line", 11.3, 4, 15.7, 4},
+		},
 		combat = {
-			{"ring", 9, 9, 6},
-			{"line", 9, 1.5, 9, 5},
-			{"line", 9, 13, 9, 16.5},
-			{"line", 1.5, 9, 5, 9},
-			{"line", 13, 9, 16.5, 9},
-			{"dot", 9, 9, 1.3},
+			{"line", 3, 3.5, 9, 1.5},
+			{"line", 9, 1.5, 15, 3.5},
+			{"line", 15, 3.5, 14, 10.5},
+			{"line", 14, 10.5, 9, 16.5},
+			{"line", 9, 16.5, 4, 10.5},
+			{"line", 4, 10.5, 3, 3.5},
+			{"line", 9, 4.5, 9, 12.5},
+			{"line", 6.5, 7, 11.5, 7},
+			{"line", 7.5, 11, 9, 12.5},
+			{"line", 9, 12.5, 10.5, 11},
 		},
 		visuals = {
-			{"rect", 1.5, 4.5, 15, 9, 4.5},
-			{"ring", 9, 9, 2.6},
+			{"arc", 9, 13.7, 9, 210, 330},
+			{"arc", 9, 4.3, 9, 30, 150},
+			{"ring", 9, 9, 2.5},
 		},
 		world = {
-			{"ring", 9, 9, 7.25},
-			{"rect", 6, 1.75, 6, 14.5, 3},
-			{"line", 2, 9, 16, 9},
+			{"ring", 9, 9, 7},
+			{"rect", 6, 2, 6, 14, 3},
+			{"line", 2.4, 6, 15.6, 6},
+			{"line", 2.4, 12, 15.6, 12},
 		},
 		player = {
-			{"ring", 9, 5.75, 3.25},
-			{"clip", 0, 11, 18, 7, {
-				{"rect", 3.25, 11.25, 11.5, 10, 5},
-			}},
+			{"ring", 9, 5, 3},
+			{"arc", 9, 16, 5.5, 180, 360},
 		},
 		settings = {
-			{"line", 2, 5.5, 16, 5.5},
-			{"line", 2, 12.5, 16, 12.5},
-			{"dot", 6, 5.5, 2.2},
-			{"dot", 12, 12.5, 2.2},
+			{"line", 2, 4, 16, 4},
+			{"line", 2, 9, 16, 9},
+			{"line", 2, 14, 16, 14},
+			{"dot", 6, 4, 1.75},
+			{"dot", 12, 9, 1.75},
+			{"dot", 7, 14, 1.75},
 		},
 		configs = {
-			{"rect", 3.5, 1.75, 11, 14.5, 2.5},
-			{"line", 6.5, 6, 11.5, 6},
-			{"line", 6.5, 9, 11.5, 9},
-			{"line", 6.5, 12, 9.5, 12},
+			{"rect", 3.5, 2.5, 11, 14, 2},
+			{"line", 7, 1, 11, 1},
+			{"line", 6.5, 7, 11.5, 7},
+			{"line", 6.5, 10, 11.5, 10},
+			{"line", 6.5, 13, 9.5, 13},
 		},
 		utilities = {
-			{"rect", 2, 2, 6, 6, 1.8},
-			{"rect", 10, 2, 6, 6, 1.8},
-			{"rect", 2, 10, 6, 6, 1.8},
-			{"ring", 13, 13, 3},
+			{"arc", 12, 5.5, 4, 65, 340},
+			{"line", 15.75, 4.1, 12.5, 6},
+			{"line", 12.5, 6, 10.5, 3.5},
+			{"line", 10.5, 3.5, 13.7, 1.9},
+			{"line", 8.5, 7.5, 2.5, 13.5},
+			{"arc", 3.8, 14.2, 1.8, 30, 240},
+			{"line", 5.4, 15, 11.2, 9.4},
 		},
 		misc = {
-			{"rect", 1.75, 1.75, 14.5, 14.5, 4},
-			{"dot", 5.75, 9, 1.25},
-			{"dot", 9, 9, 1.25},
-			{"dot", 12.25, 9, 1.25},
+			{"line", 2, 5.5, 9, 2},
+			{"line", 9, 2, 16, 5.5},
+			{"line", 16, 5.5, 9, 9},
+			{"line", 9, 9, 2, 5.5},
+			{"line", 2, 9.5, 9, 13},
+			{"line", 9, 13, 16, 9.5},
+			{"line", 2, 13, 9, 16.5},
+			{"line", 9, 16.5, 16, 13},
+		},
+		resize = {
+			{"line", 5, 15, 15, 15},
+			{"line", 15, 15, 15, 5},
+			{"line", 8, 11, 11, 8},
+			{"line", 4, 11, 11, 4},
 		},
 		chevron = {
 			{"line", 5, 7, 9, 11},
@@ -4936,6 +5139,17 @@ __modules["Nocturne.Icons.Icons"] = function(script, require)
 			local kind = shape[1]
 			if kind == "line" then
 				addLine(parent, Vector2.new(shape[2], shape[3]), Vector2.new(shape[4], shape[5]), unit, thickness, z)
+			elseif kind == "arc" then
+				local count = math.max(2, math.ceil(math.abs(shape[6] - shape[5]) / 12))
+				local function point(angle)
+					local radians = math.rad(angle)
+					return Vector2.new(shape[2] + math.cos(radians) * shape[4], shape[3] + math.sin(radians) * shape[4])
+				end
+				for index = 1, count do
+					local a = shape[5] + (shape[6] - shape[5]) * (index - 1) / count
+					local b = shape[5] + (shape[6] - shape[5]) * index / count
+					addLine(parent, point(a), point(b), unit, thickness, z)
+				end
 			elseif kind == "ring" then
 				local r = shape[4]
 				addRound(parent, shape[2] - r, shape[3] - r, r * 2, r * 2, r, unit, thickness, false, z)
@@ -4972,11 +5186,12 @@ __modules["Nocturne.Icons.Icons"] = function(script, require)
 		props = props or {}
 		size = size or 18
 		local shapes = Icons.Glyphs[name] or Icons.Glyphs.misc
+		local asset = Assets[name]
 		local unit = size / GRID
 		local thickness = props.Thickness or math.max(1, 1.5 * unit)
 		local z = props.ZIndex or 1
 
-		local icon = Instance.new("Frame")
+		local icon = Instance.new(asset and "ImageLabel" or "Frame")
 		icon.Name = "Icon_" .. name
 		icon.BackgroundTransparency = 1
 		icon.BorderSizePixel = 0
@@ -4984,7 +5199,49 @@ __modules["Nocturne.Icons.Icons"] = function(script, require)
 		icon.AnchorPoint = props.AnchorPoint or Vector2.zero
 		icon.Position = props.Position or UDim2.new()
 		icon.ZIndex = z
-		draw(icon, shapes, unit, thickness, z)
+		if asset then
+			icon.ImageTransparency = 1
+			icon:SetAttribute("AssetReady", false)
+			icon.Image = asset.Image
+			preload(asset.Image)
+			icon.ScaleType = Enum.ScaleType.Fit
+			if asset.RectOffset then
+				icon.ImageRectOffset = asset.RectOffset
+				icon.ImageRectSize = asset.RectSize
+			end
+			local fallback = Instance.new("Frame")
+			fallback.Name = "Fallback"
+			fallback.BackgroundTransparency = 1
+			fallback.BorderSizePixel = 0
+			fallback.Size = UDim2.fromScale(1, 1)
+			fallback.ZIndex = z
+			fallback.Parent = icon
+			draw(fallback, shapes, unit, thickness, z)
+			local function loaded()
+				if not icon.IsLoaded then
+					local ok, status = pcall(function() return ContentProvider:GetAssetFetchStatus(asset.Image) end)
+					if not ok or status ~= Enum.AssetFetchStatus.Success then return false end
+				end
+				-- IsLoaded can change without firing a property-changed signal.
+				if fallback then fallback:Destroy(); fallback = nil end
+				icon:SetAttribute("AssetReady", true)
+				icon.ImageTransparency = icon:GetAttribute("IconTransparency") or 0
+				if asset.SheetSize then
+					local content = icon.ContentImageSize
+					if content and content.X > 0 and content.Y > 0 then
+						local ratio = content / asset.SheetSize
+						icon.ImageRectOffset = asset.RectOffset * ratio
+						icon.ImageRectSize = asset.RectSize * ratio
+					else
+						return false
+					end
+				end
+				return true
+			end
+			if not loaded() then watchImage(icon, loaded) end
+		else
+			draw(icon, shapes, unit, thickness, z)
+		end
 		Icons.tint(icon, color or Color3.new(1, 1, 1), props.Transparency or 0)
 		if props.Parent then
 			icon.Parent = props.Parent
@@ -4993,6 +5250,9 @@ __modules["Nocturne.Icons.Icons"] = function(script, require)
 	end
 
 	local function each(icon, fn)
+		if icon:IsA("ImageLabel") then
+			fn(icon, "ImageColor3", "ImageTransparency")
+		end
 		for _, child in ipairs(icon:GetDescendants()) do
 			if child:IsA("UIStroke") then
 				fn(child, "Color", "Transparency")
@@ -5003,19 +5263,21 @@ __modules["Nocturne.Icons.Icons"] = function(script, require)
 	end
 
 	function Icons.tint(icon, color, transparency)
+		if transparency ~= nil then icon:SetAttribute("IconTransparency", transparency) end
 		each(icon, function(part, colorKey, alphaKey)
 			part[colorKey] = color
 			if transparency then
-				part[alphaKey] = transparency
+				part[alphaKey] = part == icon and icon:GetAttribute("AssetReady") == false and 1 or transparency
 			end
 		end)
 	end
 
 	function Icons.tween(icon, preset, color, transparency)
+		if transparency ~= nil then icon:SetAttribute("IconTransparency", transparency) end
 		each(icon, function(part, colorKey, alphaKey)
 			local goal = { [colorKey] = color }
 			if transparency then
-				goal[alphaKey] = transparency
+				goal[alphaKey] = part == icon and icon:GetAttribute("AssetReady") == false and 1 or transparency
 			end
 			Motion.tween(part, preset, goal)
 		end)
@@ -5176,6 +5438,10 @@ __modules["Nocturne"] = function(script, require)
 			Badge = opts.Badge,
 			Profile = opts.Profile,
 			ShowProfile = opts.ShowProfile,
+			PrivacyMode = opts.PrivacyMode,
+			Width = opts.Width,
+			Height = opts.Height,
+			Resizable = opts.Resizable,
 			Theme = opts.Theme,
 			Accent = opts.Accent,
 			MenuKey = opts.ToggleKey or opts.MenuKey,
@@ -5342,6 +5608,30 @@ __modules["Nocturne"] = function(script, require)
 
 	-- Tab ------------------------------------------------------------------------
 
+	function Tab:Open()
+		self.Window.App:Open(self.Page.Name)
+	end
+
+	function Tab:Close()
+		self.Page.Window:Close()
+	end
+
+	function Tab:Toggle()
+		if self.Page.Window.IsOpen then
+			self:Close()
+		else
+			self:Open()
+		end
+	end
+
+	function Tab:IsOpen()
+		return self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
+	end
+
+	function Tab:SetSize(width, height)
+		self.Page.Window:SetSize(width, height)
+	end
+
 	--[[
 		Tab:AddSection({ Title = "Main", Side = "Left" | "Right", Tabs = { "A", "B" } })
 		With Tabs, the section header becomes small tabs; use section:Tab("B").
@@ -5374,6 +5664,15 @@ __modules["Nocturne"] = function(script, require)
 			return nil
 		end
 		return setmetatable({ Container = container, Title = name, TabTitle = self.TabTitle }, Section)
+	end
+
+	function Section:AddTab(name)
+		local container = self.Container:AddTab(name)
+		return setmetatable({ Container = container, Title = self.Title .. "." .. name, TabTitle = self.TabTitle }, Section)
+	end
+
+	function Section:SelectTab(name)
+		self.Container:SelectTab(name)
 	end
 
 	function Section:SetVisible(visible)
@@ -5804,29 +6103,27 @@ __modules["Nocturne.Navigation.Page"] = function(script, require)
 			BorderSizePixel = 0,
 			ScrollBarThickness = 3,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			AutomaticCanvasSize = Enum.AutomaticSize.None,
 			CanvasSize = UDim2.new(),
 			VerticalScrollBarInset = Enum.ScrollBarInset.None,
 			Parent = canvas,
 		})
 		ctx.Theme:Bind(scroller, { ScrollBarImageColor3 = "BorderStrong" })
-		Util.padding(scroller, 12, 14, 14, 12)
 
 		local columns = Util.frame({
 			Name = "Columns",
-			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Position = UDim2.fromOffset(14, 12),
+			Size = UDim2.new(1, -28, 0, 0),
 			Parent = scroller,
 		})
-		Util.list(columns, { FillDirection = Enum.FillDirection.Horizontal, Padding = GAP })
 
 		local single = opts.Columns == 1
 		local function column(name, order)
 			local frame = Util.frame({
 				Name = name,
 				Size = single and UDim2.new(1, 0, 0, 0) or UDim2.new(0.5, -GAP / 2, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
 				LayoutOrder = order,
+				Position = UDim2.new(single and 0 or (order - 1) * 0.5, order == 2 and GAP / 2 or 0, 0, 0),
 				Parent = columns,
 			})
 			Util.list(frame, { Padding = GAP })
@@ -5834,6 +6131,24 @@ __modules["Nocturne.Navigation.Page"] = function(script, require)
 		end
 		self.Left = column("Left", 1)
 		self.Right = single and self.Left or column("Right", 2)
+		local function resize()
+			local scale = math.max(ctx:GetScale(), 0.01)
+			local left = self.Left:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y / scale
+			local right = self.Right:FindFirstChildOfClass("UIListLayout").AbsoluteContentSize.Y / scale
+			self.Left.Size = UDim2.new(single and 1 or 0.5, single and 0 or -GAP / 2, 0, left)
+			if not single then
+				self.Right.Size = UDim2.new(0.5, -GAP / 2, 0, right)
+			end
+			local height = math.max(left, right)
+			columns.Size = UDim2.new(1, -28, 0, height)
+			scroller.CanvasSize = UDim2.fromOffset(0, height + 26)
+		end
+		self.Left:FindFirstChildOfClass("UIListLayout"):GetPropertyChangedSignal("AbsoluteContentSize"):Connect(resize)
+		if not single then
+			self.Right:FindFirstChildOfClass("UIListLayout"):GetPropertyChangedSignal("AbsoluteContentSize"):Connect(resize)
+		end
+		scroller:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize)
+		task.defer(resize)
 
 		-- Floating popups would drift away from their fields while scrolling.
 		scroller:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
@@ -5876,10 +6191,10 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 	Toolbar.__index = Toolbar
 
 	local BUTTON = 34
-	local GAP = 4
-	local PAD = 6
+	local GAP = 7
+	local PAD = 10
 	local TOP = 12
-	local ICON = 18
+	local ICON = 20
 
 	function Toolbar.new(ctx)
 		local theme = ctx.Theme
@@ -5887,22 +6202,23 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 			ctx = ctx,
 			Items = {},
 			Active = nil,
+			OpenPages = {},
 			Clicked = Signal.new(),
 		}, Toolbar)
 
 		local surface = Util.surface(ctx, {
 			Name = "Toolbar",
-			Radius = 15,
+			Radius = 14,
 			AnchorPoint = Vector2.new(0.5, 0),
 			Position = UDim2.new(0.5, 0, 0, TOP),
 			Size = UDim2.fromOffset(PAD * 2, BUTTON + PAD * 2),
-			ShadowLayers = 6,
+			ShadowLayers = 2,
 			ShadowSpread = 3,
 			ShadowOffset = 6,
-			ShadowTransparency = 0.92,
-			GlossStrength = 0.16,
+			ShadowTransparency = 0.97,
+			GlossStrength = 0.03,
 			FillTransparency = function(tokens)
-				return math.clamp(tokens.Transparency + 0.08, 0, 0.6)
+				return math.clamp(tokens.Transparency + 0.16, 0, 0.6)
 			end,
 			ZIndex = 20,
 			Parent = ctx.Gui,
@@ -5995,7 +6311,9 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 	end
 
 	function Toolbar:SetScale(scale)
-		self.Scale.Scale = scale
+		self._requestedScale = scale
+		local width = self.Holder.Size.X.Offset
+		self.Scale.Scale = math.min(scale, math.max(0.1, (self.ctx.Gui.AbsoluteSize.X - 24) / math.max(width, 1)))
 	end
 
 	function Toolbar:_offset(index)
@@ -6005,10 +6323,17 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 	function Toolbar:_render(instant)
 		local t = self.ctx.Theme.Tokens
 		for _, item in ipairs(self.Items) do
-			local active = item.Page == self.Active
+			local active = self.OpenPages[item.Page] == true
 			local color = active and t.Text or (item.Hovered and t.TextDim or t.TextMuted)
 			Icons.tween(item.Icon, instant and "Instant" or "Fast", color)
+			Motion.tween(item.Dot, instant and "Instant" or "Fast", { BackgroundTransparency = active and 0 or 1, BackgroundColor3 = t.Text })
+			Motion.tween(item.Button, instant and "Instant" or "Fast", { BackgroundColor3 = t.Hover, BackgroundTransparency = item.Hovered and 0.45 or 1 })
 		end
+	end
+
+	function Toolbar:SetOpenPages(pages)
+		self.OpenPages = pages
+		self:_render(false)
 	end
 
 	function Toolbar:_showHint(item)
@@ -6041,13 +6366,20 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 			Parent = self.Row,
 		})
 		local scale = Util.new("UIScale", { Parent = button })
+		Util.corner(button, 8)
 		local icon = Icons.create(page.Icon, ICON, self.ctx.Theme.Tokens.TextMuted, {
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0.5, -2),
 			ZIndex = 3,
 			Parent = button,
 		})
-		local item = { Page = page, Button = button, Icon = icon, Scale = scale, Index = index, Hovered = false }
+		local dot = Util.frame({
+			Name = "OpenDot", AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -1), Size = UDim2.fromOffset(3, 3),
+			BackgroundTransparency = 1, ZIndex = 4, Parent = button,
+		})
+		Util.corner(dot, UDim.new(1, 0))
+		local item = { Page = page, Button = button, Icon = icon, Dot = dot, Scale = scale, Index = index, Hovered = false }
 		table.insert(self.Items, item)
 
 		button.MouseEnter:Connect(function()
@@ -6074,6 +6406,7 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 
 		local width = PAD * 2 + index * BUTTON + (index - 1) * GAP
 		self.Holder.Size = UDim2.fromOffset(width, BUTTON + PAD * 2)
+		self:SetScale(self._requestedScale or 1)
 		self:_render(true)
 		return item
 	end
@@ -6098,10 +6431,9 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 			Motion.tween(indicator, "Smooth", {
 				Position = target,
 				Size = UDim2.fromOffset(BUTTON, BUTTON),
-				BackgroundTransparency = 0,
+				BackgroundTransparency = 0.7,
 			})
-			Motion.tween(self.IndicatorStroke, "Smooth", { Transparency = 0.35 })
-			Motion.tween(self.Dot, "Smooth", { BackgroundTransparency = 0 })
+			Motion.tween(self.IndicatorStroke, "Smooth", { Transparency = 0.85 })
 			self._shown = true
 		elseif self._shown then
 			self._shown = false
@@ -6135,6 +6467,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 	local Signal = require(script.Parent.Parent.Core.Signal)
 	local Motion = require(script.Parent.Parent.Animations.Motion)
 	local Icons = require(script.Parent.Parent.Icons.Icons)
+	local Maid = require(script.Parent.Parent.Core.Maid)
 
 	local Window = {}
 	Window.__index = Window
@@ -6153,6 +6486,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			LayoutOrder = order,
 			Parent = parent,
 		})
+		local maid = Maid.new():LinkTo(button)
 		Util.corner(button, 6)
 		theme:Bind(button, { BackgroundColor3 = "Hover" })
 		-- `ref.Icon` can be swapped later (minimise <-> restore glyph).
@@ -6177,7 +6511,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			hovered = false
 			render(false)
 		end)
-		theme.Changed:Connect(render)
+		maid:Give(theme.Changed:Connect(render))
 		return button, ref
 	end
 
@@ -6193,17 +6527,21 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			_version = 0,
 			PageChanged = Signal.new(),
 			Closed = Signal.new(),
+			Focused = Signal.new(),
+			Maid = Maid.new(),
+			Width = opts.Width or WIDTH,
+			Height = opts.Height or HEIGHT,
 		}, Window)
 
 		local surface = Util.surface(ctx, {
 			Name = "Window",
 			Radius = 12,
-			Size = UDim2.fromOffset(WIDTH, HEIGHT),
-			ShadowLayers = 7,
-			ShadowSpread = 4,
-			ShadowOffset = 8,
-			ShadowTransparency = 0.93,
-			GlossStrength = 0.1,
+			Size = UDim2.fromOffset(self.Width, self.Height),
+			ShadowLayers = 3,
+			ShadowSpread = 3,
+			ShadowOffset = 5,
+			ShadowTransparency = 0.96,
+			GlossStrength = 0.16,
 			ZIndex = 10,
 			Parent = ctx.Gui,
 		})
@@ -6212,6 +6550,10 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 		self.Surface, self.Holder, self.Body = surface, holder, body
 		self.Scale = Util.new("UIScale", { Parent = holder })
 		self.BodyScale = Util.new("UIScale", { Parent = body })
+		body.Active = true
+		body.InputBegan:Connect(function(input)
+			if Util.isPress(input) then self.Focused:Fire() end
+		end)
 
 		-- Header ---------------------------------------------------------------
 		local header = Util.frame({
@@ -6236,25 +6578,11 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			Padding = 8,
 		})
 
-		local mark = Util.frame({
-			Name = "Mark",
-			Size = UDim2.fromOffset(16, 16),
-			BackgroundTransparency = 0,
-			LayoutOrder = 0,
-			Parent = brand,
-		})
-		Util.corner(mark, 5)
-		theme:Bind(mark, { BackgroundColor3 = "Accent" })
-		Util.gloss(mark, 0.35)
-		local markInner = Util.frame({
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(6, 6),
-			BackgroundTransparency = 0,
-			Parent = mark,
-		})
-		Util.corner(markInner, UDim.new(1, 0))
-		theme:Bind(markInner, { BackgroundColor3 = "AccentText" })
+		local mark = Icons.create("nocturne", 19, theme.Tokens.Accent, { Parent = brand })
+		mark.LayoutOrder = 0
+		self.Maid:Give(theme.Changed:Connect(function()
+			Icons.tint(mark, theme.Tokens.Accent)
+		end))
 
 		local title = Util.text({
 			Text = opts.Title or "Nocturne",
@@ -6325,6 +6653,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			})
 			Util.padding(profile, 0, 8, 0, 0)
 			local avatar = Util.new("ImageLabel", {
+				Name = "Avatar",
 				Size = UDim2.fromOffset(20, 20),
 				BackgroundTransparency = 0,
 				Image = ("rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48"):format(math.max(player.UserId, 1)),
@@ -6336,6 +6665,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			theme:Bind(avatar, { BackgroundColor3 = "Surface2" })
 			theme:Bind(avatarStroke, { Color = "BorderStrong" })
 			local name = Util.text({
+				Name = "Username",
 				Text = opts.Profile or player.DisplayName,
 				AutomaticSize = Enum.AutomaticSize.X,
 				Size = UDim2.fromScale(0, 1),
@@ -6343,6 +6673,15 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 				Parent = profile,
 			})
 			theme:Bind(name, { TextColor3 = "TextDim" })
+			local anonymous = Icons.create("player", 20, theme.Tokens.TextDim, { Parent = profile })
+			anonymous.Name = "AnonymousAvatar"
+			anonymous.LayoutOrder = 2
+			self.ProfileName, self.ProfileAvatar, self.AnonymousAvatar = name, avatar, anonymous
+			self._profileText, self._profileImage = name.Text, avatar.Image
+			self:SetPrivacyMode(opts.PrivacyMode == true)
+			self.Maid:Give(theme.Changed:Connect(function()
+				Icons.tint(anonymous, theme.Tokens.TextDim)
+			end))
 
 			local separator = Util.frame({
 				Size = UDim2.fromOffset(1, 14),
@@ -6467,10 +6806,10 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			local count = #Players:GetPlayers()
 			online.Text = ("%d %s in server"):format(count, count == 1 and "player" or "players")
 		end
-		Players.PlayerAdded:Connect(updateCount)
-		Players.PlayerRemoving:Connect(function()
+		self.Maid:Give(Players.PlayerAdded:Connect(updateCount))
+		self.Maid:Give(Players.PlayerRemoving:Connect(function()
 			task.defer(updateCount)
-		end)
+		end))
 		updateCount()
 
 		local center = Util.text({
@@ -6489,16 +6828,17 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			RichText = true,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -14, 0, 0),
+			Position = UDim2.new(1, -34, 0, 0),
 			Size = UDim2.new(0.33, 0, 1, 0),
 			Parent = footer,
 		})
 		theme:Bind(version, { TextColor3 = "TextMuted" })
 
 		self:_setupDrag()
-		theme.Changed:Connect(function(instant)
+		if opts.Resizable ~= false then self:_setupResize() end
+		self.Maid:Give(theme.Changed:Connect(function(instant)
 			self:_renderTabs(instant)
-		end)
+		end))
 		return self
 	end
 
@@ -6507,8 +6847,8 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 	function Window:_clamp(position)
 		local viewport = self.ctx.Gui.AbsoluteSize
 		local scale = self.Scale.Scale
-		local width = WIDTH * scale
-		local height = (self.Minimized and HEADER or HEIGHT) * scale
+		local width = self.Width * scale
+		local height = (self.Minimized and HEADER or self.Height) * scale
 		local x = math.clamp(position.X, 8, math.max(8, viewport.X - width - 8))
 		local y = math.clamp(position.Y, 8, math.max(8, viewport.Y - height - 8))
 		return Vector2.new(x, y)
@@ -6518,31 +6858,96 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 		local dragging, startPointer, startPosition
 		self.Header.InputBegan:Connect(function(input)
 			if Util.isPress(input) then
+				self.Focused:Fire()
 				dragging = true
 				startPointer = Util.pointer(input)
 				startPosition = Vector2.new(self.Holder.Position.X.Offset, self.Holder.Position.Y.Offset)
 				self.ctx.Popups:CloseAll()
 			end
 		end)
-		UserInputService.InputChanged:Connect(function(input)
+		self.Maid:Give(UserInputService.InputChanged:Connect(function(input)
 			if dragging and Util.isMove(input) then
 				local target = self:_clamp(startPosition + (Util.pointer(input) - startPointer))
 				self.Holder.Position = UDim2.fromOffset(target.X, target.Y)
 			end
-		end)
-		UserInputService.InputEnded:Connect(function(input)
+		end))
+		self.Maid:Give(UserInputService.InputEnded:Connect(function(input)
 			if Util.isPress(input) then
 				dragging = false
 			end
+		end))
+	end
+
+	function Window:SetPrivacyMode(enabled)
+		self.PrivacyMode = enabled
+		if self.ProfileName then
+			self.ProfileName.Text = enabled and "User" or self._profileText
+			self.ProfileAvatar.Visible = not enabled
+			self.ProfileAvatar.Image = enabled and "" or self._profileImage
+			self.AnonymousAvatar.Visible = enabled
+		end
+	end
+
+	function Window:SetSize(width, height)
+		local viewport = self.ctx.Gui.AbsoluteSize
+		local scale = math.max(self.Scale.Scale, 0.01)
+		local position = self.Holder.Position
+		local maxWidth = math.max(200, (viewport.X - position.X.Offset - 8) / scale)
+		local maxHeight = math.max(180, (viewport.Y - position.Y.Offset - 8) / scale)
+		self.Width = math.clamp(width, math.min(480, maxWidth), maxWidth)
+		self.Height = math.clamp(height, math.min(320, maxHeight), maxHeight)
+		self.Holder.Size = UDim2.fromOffset(self.Width, self.Minimized and HEADER or self.Height)
+		self.ctx.Popups:CloseAll()
+		self:_renderTabs(true)
+	end
+
+	function Window:_setupResize()
+		local handle = Util.button({
+			Name = "ResizeHandle", AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -5, 1, -5), Size = UDim2.fromOffset(24, 24),
+			ZIndex = 60, Parent = self.Body,
+		})
+		local glyph = Icons.create("resize", 18, Color3.new(1, 1, 1), {
+			Position = UDim2.fromOffset(5, 5), ZIndex = 60, Transparency = 0.45, Parent = handle,
+		})
+		self.ResizeHandle = handle
+		local dragging, startPointer, startSize
+		handle.MouseEnter:Connect(function() Icons.tween(glyph, "Fast", Color3.new(1, 1, 1), 0.05) end)
+		handle.MouseLeave:Connect(function()
+			if not dragging then Icons.tween(glyph, "Fast", Color3.new(1, 1, 1), 0.45) end
 		end)
+		handle.InputBegan:Connect(function(input)
+			if Util.isPress(input) then
+				dragging = true
+				startPointer = Util.pointer(input)
+				startSize = Vector2.new(self.Width, self.Height)
+				self.Focused:Fire()
+				self.ctx.Popups:CloseAll()
+			end
+		end)
+		self.Maid:Give(UserInputService.InputChanged:Connect(function(input)
+			if dragging and Util.isMove(input) then
+				local delta = (Util.pointer(input) - startPointer) / math.max(self.Scale.Scale, 0.01)
+				self:SetSize(startSize.X + delta.X, startSize.Y + delta.Y)
+			end
+		end))
+		self.Maid:Give(UserInputService.InputEnded:Connect(function(input)
+			if dragging and Util.isPress(input) then
+				dragging = false
+				Icons.tween(glyph, "Fast", Color3.new(1, 1, 1), 0.45)
+			end
+		end))
 	end
 
 	function Window:Center()
 		local viewport = self.ctx.Gui.AbsoluteSize
 		local scale = self.Scale.Scale
-		local x = (viewport.X - WIDTH * scale) / 2
+		local x = (viewport.X - self.Width * scale) / 2
 		local top = self.ctx.ToolbarBottom and self.ctx.ToolbarBottom() + 14 or 72
-		local y = math.max(top, (viewport.Y - HEIGHT * scale) / 2)
+		local y = math.max(top, (viewport.Y - self.Height * scale) / 2)
+		local offset = ((self.Index or 1) - 1) % 5 * 28
+		x += offset
+		y += offset
 		local target = self:_clamp(Vector2.new(x, y))
 		self.Holder.Position = UDim2.fromOffset(target.X, target.Y)
 	end
@@ -6576,7 +6981,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			return
 		end
 		-- Convert absolute coordinates back into unscaled window space.
-		local ratio = self.Tabs.AbsoluteSize.X / WIDTH
+		local ratio = self.Tabs.AbsoluteSize.X / self.Width
 		if ratio <= 0 then
 			return
 		end
@@ -6670,6 +7075,7 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 			return
 		end
 		self.IsOpen = true
+		self.Focused:Fire()
 		self._version += 1
 		local holder = self.Holder
 		if not self._placed then
@@ -6708,9 +7114,12 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 	function Window:SetMinimized(minimized)
 		self.Minimized = minimized
 		self.ctx.Popups:CloseAll()
-		Motion.tween(self.Holder, "Smooth", {
-			Size = UDim2.fromOffset(WIDTH, minimized and HEADER or HEIGHT),
-		})
+		-- Resize immediately: tweening a CanvasGroup's render target can leave it cropped.
+		self.Holder.Size = UDim2.fromOffset(self.Width, minimized and HEADER or self.Height)
+		if self.ResizeHandle then self.ResizeHandle.Visible = not minimized end
+		self.Tabs.Visible = not minimized
+		self.PageHolder.Visible = not minimized
+		self.Body.Footer.Visible = not minimized
 		-- Swap the glyph between "minimise" and "restore".
 		local ref = self._minimizeRef
 		local parent = ref.Icon.Parent
@@ -6724,6 +7133,14 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 		local position = self.Holder.Position
 		local target = self:_clamp(Vector2.new(position.X.Offset, position.Y.Offset))
 		self.Holder.Position = UDim2.fromOffset(target.X, target.Y)
+	end
+
+	function Window:Destroy()
+		self.Maid:Clean()
+		self.Holder:Destroy()
+		self.Focused:Destroy()
+		self.Closed:Destroy()
+		self.PageChanged:Destroy()
 	end
 
 	return Window
@@ -7001,7 +7418,7 @@ __modules["Nocturne.Overlays.Watermark"] = function(script, require)
 		self._divider4 = divider(self._top, 8)
 		self.Name = segment(self._top, 9, false, "TextDim")
 		local player = Players.LocalPlayer
-		self.Name.Text = player and player.DisplayName or "Player"
+		self.Name.Text = opts.PrivacyMode and "User" or (player and player.DisplayName or "Player")
 
 		self._frames, self._elapsed, self._fps = 0, 0, 60
 		return self
@@ -7107,17 +7524,17 @@ __modules["Nocturne.Themes.Presets"] = function(script, require)
 
 	Presets.Themes = {
 		Midnight = {
-			Backdrop = hex("16171B"),
-			Surface = hex("1C1D22"),
-			Surface2 = hex("24252B"),
-			Hover = hex("2D2E35"),
-			Elevated = hex("1F2025"),
-			Border = hex("2B2C33"),
-			BorderStrong = hex("3A3B44"),
+			Backdrop = hex("202125"),
+			Surface = hex("2A2B31"),
+			Surface2 = hex("36373E"),
+			Hover = hex("46474F"),
+			Elevated = hex("292A30"),
+			Border = hex("41424A"),
+			BorderStrong = hex("555660"),
 			Text = hex("ECEDF1"),
-			TextDim = hex("A3A5AE"),
-			TextMuted = hex("6A6C76"),
-			Accent = hex("CDD3E0"),
+			TextDim = hex("B4B5BE"),
+			TextMuted = hex("8C8E9A"),
+			Accent = hex("E1E2E8"),
 			AccentText = hex("121317"),
 			Success = hex("7BD3A0"),
 			Warning = hex("E8C47F"),
@@ -7289,7 +7706,7 @@ __modules["Nocturne.Themes.Theme"] = function(script, require)
 		self.Name = Presets.Themes[presetName] and presetName or "Midnight"
 		self.Values = {
 			Accent = nil,
-			Transparency = 0.04,
+			Transparency = 0.16,
 			Gloss = true,
 		}
 		self.Tokens = {}

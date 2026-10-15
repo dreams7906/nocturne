@@ -38,7 +38,7 @@ return function(app)
 		Text = "Window transparency",
 		Min = 0,
 		Max = 40,
-		Default = 4,
+		Default = 16,
 		Suffix = "%",
 		Flag = "UI.Transparency",
 		Callback = function(v)
@@ -69,6 +69,13 @@ return function(app)
 	})
 
 	local interface = page:Section({ Title = "Interface" })
+	interface:Switch({
+		Text = "Hide username & avatar",
+		Default = app.PrivacyMode,
+		Flag = "UI.PrivacyMode",
+		Tooltip = "Use a person icon and the name User in all windows and the watermark.",
+		Callback = function(enabled) app:SetPrivacyMode(enabled) end,
+	})
 	interface:Slider({
 		Text = "UI scale",
 		Min = 70,
@@ -85,7 +92,7 @@ return function(app)
 		Text = "Menu key",
 		Bind = app:GetMenuBind(),
 		Flag = "UI.MenuKey",
-		Tooltip = "Toggles the window. Backspace can't clear this one.",
+		Tooltip = "Hides or restores every window and the dock. Backspace can't clear this one.",
 	})
 	interface:Switch({
 		Text = "Tooltips",
@@ -99,13 +106,13 @@ return function(app)
 		Text = "Collapse on reselect",
 		Default = true,
 		Flag = "UI.CollapseOnReselect",
-		Tooltip = "Clicking the active dock icon again closes the window.",
+		Tooltip = "Clicking an open dock icon again closes only its window.",
 		Callback = function(v)
 			app.CollapseOnReselect = v
 		end,
 	})
 	interface:Button({
-		Text = "Re-centre window",
+		Text = "Re-centre windows",
 		Callback = function()
 			app:ResetPosition()
 		end,

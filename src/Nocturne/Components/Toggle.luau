@@ -16,21 +16,20 @@ local Util = require(script.Parent.Parent.Core.Util)
 local Signal = require(script.Parent.Parent.Core.Signal)
 local Maid = require(script.Parent.Parent.Core.Maid)
 local Motion = require(script.Parent.Parent.Animations.Motion)
-local Icons = require(script.Parent.Parent.Icons.Icons)
 
 return function(container, opts)
 	local ctx = container.ctx
 	local theme = ctx.Theme
 	local isSwitch = opts.Style == "Switch"
 
-	local row = container:Row(26)
+	local row = container:Row(24)
 	local maid = Maid.new():LinkTo(row)
 	local value = opts.Default == true
 	local hovered = false
 
 	local hit = Util.button({ Name = "Hit", Size = UDim2.fromScale(1, 1), ZIndex = 1, Parent = row })
 
-	local box, fill, check, glow, knob
+	local box, fill, knob
 	if isSwitch then
 		box = Util.frame({
 			Name = "Track",
@@ -53,26 +52,16 @@ return function(container, opts)
 		})
 		Util.corner(knob, UDim.new(1, 0))
 	else
-		glow = Util.frame({
-			Name = "Glow",
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0, 7, 0.5, 0),
-			Size = UDim2.fromOffset(22, 22),
-			BackgroundTransparency = 1,
-			ZIndex = 1,
-			Parent = row,
-		})
-		Util.corner(glow, 8)
 		box = Util.frame({
 			Name = "Box",
 			AnchorPoint = Vector2.new(0, 0.5),
 			Position = UDim2.new(0, 0, 0.5, 0),
-			Size = UDim2.fromOffset(14, 14),
+			Size = UDim2.fromOffset(18, 18),
 			BackgroundTransparency = 0,
 			ZIndex = 2,
 			Parent = row,
 		})
-		Util.corner(box, 4)
+		Util.corner(box, 5)
 		fill = Util.frame({
 			Name = "Fill",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -82,16 +71,7 @@ return function(container, opts)
 			ZIndex = 3,
 			Parent = box,
 		})
-		Util.corner(fill, 4)
-		Util.gloss(fill, 0.18)
-		check = Icons.create("check", 12, Color3.new(), {
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.5),
-			Transparency = 1,
-			ZIndex = 4,
-			Thickness = 1.6,
-			Parent = box,
-		})
+		Util.corner(fill, 5)
 	end
 	local stroke = Util.stroke(box, { Transparency = 0.1 })
 
@@ -129,7 +109,7 @@ return function(container, opts)
 		Motion.tween(label, preset, { TextColor3 = (value or hovered) and t.Text or t.TextDim })
 		if isSwitch then
 			Motion.tween(box, preset, { BackgroundColor3 = value and t.Accent or (hovered and t.Hover or t.Surface2) })
-			Motion.tween(stroke, preset, { Color = value and t.Accent or t.BorderStrong })
+			Motion.tween(stroke, preset, { Color = value and t.Accent or t.BorderStrong, Transparency = value and 0.2 or 0.5 })
 			Motion.tween(knob, instant and "Instant" or "Normal", {
 				Position = UDim2.new(0, value and 14 or 2, 0.5, 0),
 				BackgroundColor3 = value and t.AccentText or t.TextDim,
@@ -141,11 +121,6 @@ return function(container, opts)
 				Size = value and UDim2.fromScale(1, 1) or UDim2.fromScale(0, 0),
 				BackgroundColor3 = t.Accent,
 			})
-			Motion.tween(glow, preset, {
-				BackgroundColor3 = t.Accent,
-				BackgroundTransparency = value and 0.86 or 1,
-			})
-			Icons.tween(check, preset, t.AccentText, value and 0 or 1)
 		end
 	end
 

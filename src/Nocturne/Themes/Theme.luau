@@ -30,7 +30,7 @@ function Theme.new(presetName)
 	self.Name = Presets.Themes[presetName] and presetName or "Midnight"
 	self.Values = {
 		Accent = nil,
-		Transparency = 0.04,
+		Transparency = 0.16,
 		Gloss = true,
 	}
 	self.Tokens = {}

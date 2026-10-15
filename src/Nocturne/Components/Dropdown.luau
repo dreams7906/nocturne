@@ -140,7 +140,7 @@ return function(container, opts)
 		local selected = isSelected(entry.option)
 		local preset = instant and "Instant" or "Fast"
 		Motion.tween(entry.button, preset, {
-			BackgroundColor3 = selected and t.AccentSoft or t.Hover,
+			BackgroundColor3 = selected and t.Hover:Lerp(t.Text, 0.12) or t.Hover,
 			BackgroundTransparency = selected and 0 or (entry.hovered and 0 or 1),
 		})
 		Motion.tween(entry.label, preset, {
@@ -265,7 +265,7 @@ return function(container, opts)
 		local holder = popup.Surface.Holder
 		local height = listHeight()
 		local width = field.AbsoluteSize.X / scale
-		local fieldPos = field.AbsolutePosition
+		local fieldPos = field.AbsolutePosition - ctx.Overlay.AbsolutePosition
 		local viewport = ctx.Gui.AbsoluteSize
 		local below = fieldPos.Y + field.AbsoluteSize.Y + 4 + height * scale <= viewport.Y - 8
 

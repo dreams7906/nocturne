@@ -148,6 +148,10 @@ function Library:CreateWindow(opts)
 		Badge = opts.Badge,
 		Profile = opts.Profile,
 		ShowProfile = opts.ShowProfile,
+		PrivacyMode = opts.PrivacyMode,
+		Width = opts.Width,
+		Height = opts.Height,
+		Resizable = opts.Resizable,
 		Theme = opts.Theme,
 		Accent = opts.Accent,
 		MenuKey = opts.ToggleKey or opts.MenuKey,
@@ -314,6 +318,30 @@ end
 
 -- Tab ------------------------------------------------------------------------
 
+function Tab:Open()
+	self.Window.App:Open(self.Page.Name)
+end
+
+function Tab:Close()
+	self.Page.Window:Close()
+end
+
+function Tab:Toggle()
+	if self.Page.Window.IsOpen then
+		self:Close()
+	else
+		self:Open()
+	end
+end
+
+function Tab:IsOpen()
+	return self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
+end
+
+function Tab:SetSize(width, height)
+	self.Page.Window:SetSize(width, height)
+end
+
 --[[
 	Tab:AddSection({ Title = "Main", Side = "Left" | "Right", Tabs = { "A", "B" } })
 	With Tabs, the section header becomes small tabs; use section:Tab("B").
@@ -346,6 +374,15 @@ function Section:Tab(name)
 		return nil
 	end
 	return setmetatable({ Container = container, Title = name, TabTitle = self.TabTitle }, Section)
+end
+
+function Section:AddTab(name)
+	local container = self.Container:AddTab(name)
+	return setmetatable({ Container = container, Title = self.Title .. "." .. name, TabTitle = self.TabTitle }, Section)
+end
+
+function Section:SelectTab(name)
+	self.Container:SelectTab(name)
 end
 
 function Section:SetVisible(visible)

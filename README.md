@@ -1,10 +1,10 @@
 # Nocturne
 
-A single-file Luau interface library for Roblox with a dark, glossy look: a floating glass **dock** at the top of the screen, a compact tabbed window, two-column sections, and a full set of themed controls.
+A single-file Luau interface library for Roblox with a charcoal interface: a floating **dock**, independent draggable category windows, two-column sections, and a full set of themed controls.
 
 ![Dock](preview/dock.svg)
 
-Every icon is drawn from plain GuiObjects, the same way the color picker and soft shadows are, so the library needs **no uploaded image assets**.
+The 29 icons use generated transparent artwork uploaded through Roblox Studio MCP: nine main images and a shared sheet for 20 controls. Their Roblox asset IDs are bundled into the library. Drawn fallbacks stay visible while an image is loading or awaiting Roblox processing.
 
 ```lua
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
@@ -33,10 +33,14 @@ For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)
 
 ## Features
 
-- **Floating dock.** Each tab gets an icon in a glass dock at the top centre of the screen. Click an icon to open that tab. Click the active icon again to close the window; the dock stays. A highlight pill glides between icons and carries an accent dot, and hovering shows a small label.
-- **Window.** A brand header with badge, profile and minimise/close buttons, category tabs with a sliding indicator, a scrolling two-column page area and a status footer. You can drag it by the header, and it opens and closes with a scale-and-fade.
+- **Floating dock.** Each category has an icon and its own window. Open several together, drag them separately, and click an open icon again to close only that window. Dots show every open category; hovering shows its name.
+- **Hide everything.** Right Ctrl (or your menu key) hides the dock, windows, popups and overlays together. Press it again to restore your windows in their previous positions.
+- **Windows.** Each has a brand header, category label, profile, minimise/restore and close buttons, a scrolling two-column page area and a status footer. Minimizing hides the content and footer; restoring returns the full panel.
+- **Glass finish.** Translucent gradient surfaces, soft white rim lighting and brighter outlined sections.
+- **Resize.** Hold the white grip in a window's bottom-right corner to change its width and height. Each window keeps its own size.
+- **Profile privacy.** Settings → Interface → Hide username & avatar replaces the profile with `User` and a person icon in every window and masks the watermark name.
 - **Sections** with optional header tabs. One panel can hold several control groups (`Tabs = { "Crosshair", "Color" }`).
-- **Elements:** toggle (check or switch style), slider with typeable value, dropdown (single or multi-select), text/number input, keybind, color picker (SV square, hue bar, hex, presets), button (same-row and confirm-to-click), label, paragraph, info row and divider.
+- **Elements:** filled-square toggle or switch, slider with typeable value, dropdown (single or multi-select), text/number input, keybind, color picker (SV square, hue bar, hex, presets), button (same-row and confirm-to-click), label, paragraph, info row and divider.
 - **Keybinds** refuse keys that are already in use (with a notification), cancel with Esc, clear with Backspace, attach to toggles (Toggle or Hold mode) and show in an optional keybind-list overlay.
 - **Built-in Configs tab:** save, load, rename and delete named configs, and export/import as JSON. Configs persist per player when `server/ConfigPersistence.server.lua` is installed; otherwise they last for the session.
 - **Built-in Settings tab:** 7 theme presets, a custom accent color, window transparency, glossy effects on/off, background blur, UI scale, menu key, tooltips, reduced motion, animation speed, notification options, a watermark (single or two row) and a keybind list.
@@ -58,6 +62,7 @@ tools/bundle.py              src/ -> Nocturne.lua
 tools/export_assets.py       icons -> assets/icons/*.svg, preview sheets
 tools/smoketest/             headless test that runs Example.lua and clicks everything
 assets/icons/                SVG exports of every built-in icon
+assets/generated-icons/      uploaded PNG artwork, asset IDs and generation prompts
 assets/references/           the reference screenshots the design was based on
 docs/                        design guide, reference notes, installation
 default.project.json         Rojo project (library + server script)
@@ -80,11 +85,28 @@ local Window = Library:CreateWindow({
 	OpenOnStart = true,
 	ConfigsTab = true,                      -- add the built-in Configs tab
 	SettingsTab = true,                     -- add the built-in Settings tab
+	PrivacyMode = false,                    -- replace the name/avatar with User/person icon
+	Resizable = true,
+	Width = 680,
+	Height = 520,
 })
 
 Window:SelectTab("Combat")   -- by title, index or tab object
 Window:Open()  Window:Close()  Window:Toggle()
 Window:SetScale(0.9)
+```
+
+`Window:Close()` and `Window:Toggle()` affect the whole interface, including the dock. Each `AddTab` creates a separate category window:
+
+```lua
+local Combat = Window:AddTab({ Title = "Combat", Icon = "combat" })
+local Visuals = Window:AddTab({ Title = "Visuals", Icon = "visuals" })
+Combat:Open()
+Visuals:Open() -- both remain open and can be dragged independently
+Combat:Close() -- Visuals stays open
+Visuals:Toggle()
+Visuals:SetSize(820, 620)
+print(Visuals:IsOpen())
 ```
 
 The built-in tabs are added after your script finishes its setup, so they always sit at the end of the dock.
@@ -103,10 +125,23 @@ local ColorTab = Cross:Tab("Color")
 ColorTab:AddColorPicker("CrossColor", { Title = "Crosshair color" })
 ```
 
+Sections can also have a title above their own sub-tabs, and new sub-tabs can be added later:
+
+```lua
+local Abilities = Combat:AddSection({
+	Title = "Abilities", Tabs = { "Bindings", "Behavior" }, Side = "Left",
+})
+Abilities:AddKeybind("CastKey", { Title = "Cast", Default = Enum.KeyCode.E })
+Abilities:Tab("Behavior"):AddToggle("QuickCast", { Title = "Quick cast" })
+local Advanced = Abilities:AddTab("Advanced")
+Advanced:AddSlider("CastDelay", { Title = "Delay", Min = 0, Max = 100 })
+Abilities:SelectTab("Advanced")
+```
+
 - `Side` accepts `"Left"`, `"Right"`, `1` or `2`. If you leave it out, sections alternate between columns.
 - `Section:SetVisible(bool)` hides a whole panel.
 
-**Built-in icons:** `combat`, `visuals`, `world`, `player`, `settings`, `configs`, `utilities`, `misc`, `sparkle`, `palette`, `bell`, `info`, `warning`, `success`, `search`, `keyboard`, `save`, `load`, `copy`, `trash`, `pencil`, `plus`, `check`, `chevron`, `close`, `minimize`, `maximize`. To add your own, put another entry in `Icons.Glyphs` (see `src/Nocturne/Icons/Icons.luau`). Glyphs are lines, rings, rounded rects and dots on an 18×18 grid.
+**Built-in icons:** `nocturne`, `combat`, `visuals`, `world`, `player`, `settings`, `configs`, `utilities`, `misc`, `resize`, `sparkle`, `palette`, `bell`, `info`, `warning`, `success`, `search`, `keyboard`, `save`, `load`, `copy`, `trash`, `pencil`, `plus`, `check`, `chevron`, `close`, `minimize`, `maximize`. Uploaded image IDs and sprite regions live in `src/Nocturne/Icons/Assets.luau`; fallback shapes live in `Icons.Glyphs`. Both support theme tints and hover animation.
 
 ## Elements
 
@@ -268,7 +303,7 @@ Library:OnUnload(function() end)
 Library:Unload()   -- disconnects input, removes the GUI and blur
 ```
 
-Calling `CreateWindow` again unloads the previous window first, and the ScreenGui is replaced instead of stacked.
+Calling `CreateWindow` again unloads the previous interface and its category windows. Use `AddTab` on the same interface to create windows that coexist.
 
 ## Building and testing
 
@@ -276,12 +311,15 @@ Calling `CreateWindow` again unloads the previous window first, and the ScreenGu
 python tools/bundle.py
 ```
 
+If uploaded icon IDs change in `assets/generated-icons/manifest.json`, run `python tools/build_icon_assets.py` before bundling. This generates all 29 asset mappings, including the control-sheet regions.
+
 ```bash
 python tools/export_assets.py
 ```
 
 ```bash
 python tools/smoketest/run.py path/to/luau.exe
+python tools/smoketest/run.py path/to/luau.exe --remote
 ```
 
 The smoke test uses the official `luau` CLI ([releases](https://github.com/luau-lang/luau/releases)). It runs the bundled library and `Example.lua` inside a small Roblox mock, then:
@@ -290,6 +328,7 @@ The smoke test uses the official `luau` CLI ([releases](https://github.com/luau-
 - drags every slider and types into every text box
 - rebinds keys, including a conflicting key that must be refused
 - checks clamping and step snapping
+- checks independent category windows, full-interface hide/restore, minimize/restore, resize dragging, profile privacy, dynamic section sub-tabs, and exact color-picker cursor positioning at reduced scale with a nonzero GUI inset
 - round-trips configs, cycles all themes, and unloads and recreates the window
 
 It reports any Lua error and fails on broken behaviour. It doesn't render anything, so check visuals in Studio.

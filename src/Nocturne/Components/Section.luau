@@ -24,25 +24,37 @@ function Section.new(ctx, parent, opts, order)
 		LayoutOrder = order,
 		Parent = parent,
 	})
-	Util.corner(frame, 8)
-	local stroke = Util.stroke(frame, { Transparency = 0.05 })
-	theme:Bind(frame, { BackgroundColor3 = "Surface" })
-	theme:Bind(stroke, { Color = "Border" })
-	ctx:RegisterGloss(Util.gloss(frame, 0.07))
-	ctx:RegisterGloss(Util.sheen(frame, 10, 0.94))
+	Util.corner(frame, 10)
+	Util.glassStroke(ctx, frame, "BorderStrong", 0.56)
+	theme:Bind(frame, { BackgroundColor3 = "Surface", BackgroundTransparency = function(t) return 0.08 + t.Transparency * 0.5 end })
+	ctx:RegisterGloss(Util.gloss(frame, 0.12))
 	Util.list(frame, {})
+	if opts.Title and opts.Tabs then
+		local titleRow = Util.frame({ Name = "Title", Size = UDim2.new(1, 0, 0, 28), LayoutOrder = 0, Parent = frame })
+		local title = Util.text({
+			Text = opts.Title, FontFace = Util.Fonts.Bold, TextSize = 12,
+			Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -24, 1, -4), Parent = titleRow,
+		})
+		theme:Bind(title, { TextColor3 = "Text" })
+	end
 
-	local header = Util.frame({
+	local header = Util.new("ScrollingFrame", {
 		Name = "Header",
 		Size = UDim2.new(1, 0, 0, 34),
 		LayoutOrder = 1,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 0,
+		ScrollingDirection = Enum.ScrollingDirection.X,
+		AutomaticCanvasSize = Enum.AutomaticSize.X,
+		CanvasSize = UDim2.new(),
 		Parent = frame,
 	})
 	Util.padding(header, 0, 12)
 	Util.list(header, {
 		FillDirection = Enum.FillDirection.Horizontal,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = 14,
+		Padding = 5,
 	})
 
 	local divider = Util.frame({
@@ -61,6 +73,7 @@ function Section.new(ctx, parent, opts, order)
 	local tabNames = opts.Tabs or { opts.Title or "Section" }
 	local bodies, containers, buttons = {}, {}, {}
 	local active
+	local count = 0
 
 	local function renderTabs(instant)
 		local t = theme.Tokens
@@ -68,12 +81,15 @@ function Section.new(ctx, parent, opts, order)
 			local isActive = name == active
 			Motion.tween(button, instant and "Instant" or "Fast", {
 				TextColor3 = isActive and t.Text or (button:GetAttribute("Hovered") and t.TextDim or t.TextMuted),
+				BackgroundColor3 = t.Text,
+				BackgroundTransparency = count > 1 and (isActive and 0.89 or (button:GetAttribute("Hovered") and 0.96 or 1)) or 1,
 			})
 			button.FontFace = isActive and Util.Fonts.Bold or Util.Fonts.SemiBold
 		end
 	end
 
 	local function select(name)
+		if not bodies[name] then return end
 		if active == name then
 			return
 		end
@@ -84,20 +100,25 @@ function Section.new(ctx, parent, opts, order)
 		renderTabs(false)
 	end
 
-	for index, name in ipairs(tabNames) do
-		local isTabbed = opts.Tabs ~= nil
-		local button = Util.new(isTabbed and "TextButton" or "TextLabel", {
+	local addTab
+	addTab = function(name)
+		if containers[name] then return containers[name] end
+		count += 1
+		local index = count
+		local button = Util.button({
 			Name = name,
 			Text = name,
 			BackgroundTransparency = 1,
 			FontFace = Util.Fonts.Bold,
 			TextSize = 12,
 			AutomaticSize = Enum.AutomaticSize.X,
-			Size = UDim2.fromScale(0, 1),
+			Size = UDim2.fromOffset(0, 24),
 			LayoutOrder = index,
 			Parent = header,
 		})
-		if isTabbed then
+		Util.corner(button, 6)
+		Util.padding(button, 0, 8)
+		do
 			button.AutoButtonColor = false
 			button.Activated:Connect(function()
 				select(name)
@@ -125,20 +146,23 @@ function Section.new(ctx, parent, opts, order)
 		Util.list(body, { Padding = 2 })
 		bodies[name] = body
 		containers[name] = Container.new(ctx, body)
+		local container = containers[name]
+		container.Section = frame
+		function container:Tab(tabName) return containers[tabName] end
+		function container:AddTab(tabName) return addTab(tabName) end
+		function container:SelectTab(tabName) select(tabName) end
+		if not active then active = name end
+		renderTabs(true)
+		return container
+	end
+	for _, name in ipairs(tabNames) do
+		addTab(name)
 	end
 	active = tabNames[1]
 	theme.Changed:Connect(renderTabs)
 	renderTabs(true)
 
-	local section = containers[tabNames[1]]
-	section.Section = frame
-	function section:Tab(name)
-		return containers[name]
-	end
-	function section:SelectTab(name)
-		select(name)
-	end
-	return section
+	return containers[tabNames[1]]
 end
 
 return Section

@@ -70,7 +70,7 @@ function Tooltip:Show(target, text)
 			end
 			local viewport = self.ctx.Gui.AbsoluteSize
 			local size = frame.AbsoluteSize
-			local position = target.AbsolutePosition
+			local position = target.AbsolutePosition - self.ctx.Overlay.AbsolutePosition
 			local targetSize = target.AbsoluteSize
 			local x = position.X + targetSize.X + 8
 			local y = position.Y + targetSize.Y / 2 - size.Y / 2

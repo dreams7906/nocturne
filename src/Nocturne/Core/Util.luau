@@ -171,22 +171,28 @@ end
 -- Stroke that is brighter on the top edge than on the bottom edge.
 function Util.glassStroke(ctx, parent, token, transparency)
 	local stroke = Util.stroke(parent, { Transparency = transparency or 0 })
-	ctx.Theme:Bind(stroke, { Color = token or "BorderStrong" })
+	ctx.Theme:Bind(stroke, { Color = function(tokens)
+		return tokens[token or "BorderStrong"]:Lerp(Color3.new(1, 1, 1), 0.68)
+	end })
 	Util.new("UIGradient", {
 		Rotation = 90,
-		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(0.62, 0.62, 0.62)),
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.05),
+			NumberSequenceKeypoint.new(0.45, 0.62),
+			NumberSequenceKeypoint.new(1, 0.18),
+		}),
 		Parent = stroke,
 	})
 	return stroke
 end
 
--- Converts an InputObject position to ScreenGui space (IgnoreGuiInset = true).
+-- InputObject.Position and GuiObject.AbsolutePosition both account for the inset.
 function Util.pointer(input)
-	local inset = GuiService:GetGuiInset()
 	if input then
-		return Vector2.new(input.Position.X, input.Position.Y) + inset
+		return Vector2.new(input.Position.X, input.Position.Y)
 	end
-	return UserInputService:GetMouseLocation()
+	local inset = GuiService:GetGuiInset()
+	return UserInputService:GetMouseLocation() - inset
 end
 
 function Util.contains(guiObject, point, margin)
@@ -295,6 +301,22 @@ function Util.surface(ctx, opts)
 	ctx.Theme:Bind(fill, fillMap)
 	local gloss = Util.gloss(fill, opts.GlossStrength or 0.12)
 	ctx:RegisterGloss(gloss)
+	local reflection = Util.frame({
+		Name = "Reflection", Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0,
+		ZIndex = 1, Parent = body,
+	})
+	Util.corner(reflection, radius)
+	Util.new("UIGradient", {
+		Rotation = 115,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.91),
+			NumberSequenceKeypoint.new(0.35, 0.98),
+			NumberSequenceKeypoint.new(0.65, 1),
+			NumberSequenceKeypoint.new(1, 0.97),
+		}), Parent = reflection,
+	})
+	ctx:RegisterGloss(reflection)
 
 	-- Inner edge: a frame inset by 1px whose outside stroke lands exactly on
 	-- the body's outermost pixel, so it survives CanvasGroup clipping.
@@ -306,7 +328,13 @@ function Util.surface(ctx, opts)
 		Parent = body,
 	})
 	Util.corner(edge, math.max(radius - 1, 0))
-	Util.glassStroke(ctx, edge, opts.EdgeToken or "BorderStrong", opts.EdgeTransparency or 0.15)
+	Util.glassStroke(ctx, edge, opts.EdgeToken or "BorderStrong", opts.EdgeTransparency or 0.4)
+	local rim = Util.frame({
+		Name = "RimLight", Size = UDim2.new(1, 2, 1, 2), Position = UDim2.fromOffset(-1, -1),
+		ZIndex = 2, Parent = holder,
+	})
+	Util.corner(rim, radius + 1)
+	local rimStroke = Util.stroke(rim, { Color = Color3.new(1, 1, 1), Transparency = 0.94, Thickness = 3 })
 
 	local sheen = Util.sheen(body, radius + 4, 0.88)
 	sheen.ZIndex = 51
@@ -322,6 +350,7 @@ function Util.surface(ctx, opts)
 
 	function surface.SetAlpha(alpha, preset)
 		Motion.tween(body, preset or "Normal", { GroupTransparency = alpha })
+		Motion.tween(rimStroke, preset or "Normal", { Transparency = 1 - 0.06 * (1 - alpha) })
 		for _, shadow in ipairs(shadows) do
 			local target = 1 - (1 - shadowAlpha) * (1 - alpha)
 			Motion.tween(shadow, preset or "Normal", { BackgroundTransparency = target })

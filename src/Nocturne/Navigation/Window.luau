@@ -12,6 +12,7 @@ local Util = require(script.Parent.Parent.Core.Util)
 local Signal = require(script.Parent.Parent.Core.Signal)
 local Motion = require(script.Parent.Parent.Animations.Motion)
 local Icons = require(script.Parent.Parent.Icons.Icons)
+local Maid = require(script.Parent.Parent.Core.Maid)
 
 local Window = {}
 Window.__index = Window
@@ -30,6 +31,7 @@ local function iconButton(ctx, parent, iconName, order)
 		LayoutOrder = order,
 		Parent = parent,
 	})
+	local maid = Maid.new():LinkTo(button)
 	Util.corner(button, 6)
 	theme:Bind(button, { BackgroundColor3 = "Hover" })
 	-- `ref.Icon` can be swapped later (minimise <-> restore glyph).
@@ -54,7 +56,7 @@ local function iconButton(ctx, parent, iconName, order)
 		hovered = false
 		render(false)
 	end)
-	theme.Changed:Connect(render)
+	maid:Give(theme.Changed:Connect(render))
 	return button, ref
 end
 
@@ -70,17 +72,21 @@ function Window.new(ctx, opts)
 		_version = 0,
 		PageChanged = Signal.new(),
 		Closed = Signal.new(),
+		Focused = Signal.new(),
+		Maid = Maid.new(),
+		Width = opts.Width or WIDTH,
+		Height = opts.Height or HEIGHT,
 	}, Window)
 
 	local surface = Util.surface(ctx, {
 		Name = "Window",
 		Radius = 12,
-		Size = UDim2.fromOffset(WIDTH, HEIGHT),
-		ShadowLayers = 7,
-		ShadowSpread = 4,
-		ShadowOffset = 8,
-		ShadowTransparency = 0.93,
-		GlossStrength = 0.1,
+		Size = UDim2.fromOffset(self.Width, self.Height),
+		ShadowLayers = 3,
+		ShadowSpread = 3,
+		ShadowOffset = 5,
+		ShadowTransparency = 0.96,
+		GlossStrength = 0.16,
 		ZIndex = 10,
 		Parent = ctx.Gui,
 	})
@@ -89,6 +95,10 @@ function Window.new(ctx, opts)
 	self.Surface, self.Holder, self.Body = surface, holder, body
 	self.Scale = Util.new("UIScale", { Parent = holder })
 	self.BodyScale = Util.new("UIScale", { Parent = body })
+	body.Active = true
+	body.InputBegan:Connect(function(input)
+		if Util.isPress(input) then self.Focused:Fire() end
+	end)
 
 	-- Header ---------------------------------------------------------------
 	local header = Util.frame({
@@ -113,25 +123,11 @@ function Window.new(ctx, opts)
 		Padding = 8,
 	})
 
-	local mark = Util.frame({
-		Name = "Mark",
-		Size = UDim2.fromOffset(16, 16),
-		BackgroundTransparency = 0,
-		LayoutOrder = 0,
-		Parent = brand,
-	})
-	Util.corner(mark, 5)
-	theme:Bind(mark, { BackgroundColor3 = "Accent" })
-	Util.gloss(mark, 0.35)
-	local markInner = Util.frame({
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(6, 6),
-		BackgroundTransparency = 0,
-		Parent = mark,
-	})
-	Util.corner(markInner, UDim.new(1, 0))
-	theme:Bind(markInner, { BackgroundColor3 = "AccentText" })
+	local mark = Icons.create("nocturne", 19, theme.Tokens.Accent, { Parent = brand })
+	mark.LayoutOrder = 0
+	self.Maid:Give(theme.Changed:Connect(function()
+		Icons.tint(mark, theme.Tokens.Accent)
+	end))
 
 	local title = Util.text({
 		Text = opts.Title or "Nocturne",
@@ -202,6 +198,7 @@ function Window.new(ctx, opts)
 		})
 		Util.padding(profile, 0, 8, 0, 0)
 		local avatar = Util.new("ImageLabel", {
+			Name = "Avatar",
 			Size = UDim2.fromOffset(20, 20),
 			BackgroundTransparency = 0,
 			Image = ("rbxthumb://type=AvatarHeadShot&id=%d&w=48&h=48"):format(math.max(player.UserId, 1)),
@@ -213,6 +210,7 @@ function Window.new(ctx, opts)
 		theme:Bind(avatar, { BackgroundColor3 = "Surface2" })
 		theme:Bind(avatarStroke, { Color = "BorderStrong" })
 		local name = Util.text({
+			Name = "Username",
 			Text = opts.Profile or player.DisplayName,
 			AutomaticSize = Enum.AutomaticSize.X,
 			Size = UDim2.fromScale(0, 1),
@@ -220,6 +218,15 @@ function Window.new(ctx, opts)
 			Parent = profile,
 		})
 		theme:Bind(name, { TextColor3 = "TextDim" })
+		local anonymous = Icons.create("player", 20, theme.Tokens.TextDim, { Parent = profile })
+		anonymous.Name = "AnonymousAvatar"
+		anonymous.LayoutOrder = 2
+		self.ProfileName, self.ProfileAvatar, self.AnonymousAvatar = name, avatar, anonymous
+		self._profileText, self._profileImage = name.Text, avatar.Image
+		self:SetPrivacyMode(opts.PrivacyMode == true)
+		self.Maid:Give(theme.Changed:Connect(function()
+			Icons.tint(anonymous, theme.Tokens.TextDim)
+		end))
 
 		local separator = Util.frame({
 			Size = UDim2.fromOffset(1, 14),
@@ -344,10 +351,10 @@ function Window.new(ctx, opts)
 		local count = #Players:GetPlayers()
 		online.Text = ("%d %s in server"):format(count, count == 1 and "player" or "players")
 	end
-	Players.PlayerAdded:Connect(updateCount)
-	Players.PlayerRemoving:Connect(function()
+	self.Maid:Give(Players.PlayerAdded:Connect(updateCount))
+	self.Maid:Give(Players.PlayerRemoving:Connect(function()
 		task.defer(updateCount)
-	end)
+	end))
 	updateCount()
 
 	local center = Util.text({
@@ -366,16 +373,17 @@ function Window.new(ctx, opts)
 		RichText = true,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -14, 0, 0),
+		Position = UDim2.new(1, -34, 0, 0),
 		Size = UDim2.new(0.33, 0, 1, 0),
 		Parent = footer,
 	})
 	theme:Bind(version, { TextColor3 = "TextMuted" })
 
 	self:_setupDrag()
-	theme.Changed:Connect(function(instant)
+	if opts.Resizable ~= false then self:_setupResize() end
+	self.Maid:Give(theme.Changed:Connect(function(instant)
 		self:_renderTabs(instant)
-	end)
+	end))
 	return self
 end
 
@@ -384,8 +392,8 @@ end
 function Window:_clamp(position)
 	local viewport = self.ctx.Gui.AbsoluteSize
 	local scale = self.Scale.Scale
-	local width = WIDTH * scale
-	local height = (self.Minimized and HEADER or HEIGHT) * scale
+	local width = self.Width * scale
+	local height = (self.Minimized and HEADER or self.Height) * scale
 	local x = math.clamp(position.X, 8, math.max(8, viewport.X - width - 8))
 	local y = math.clamp(position.Y, 8, math.max(8, viewport.Y - height - 8))
 	return Vector2.new(x, y)
@@ -395,31 +403,96 @@ function Window:_setupDrag()
 	local dragging, startPointer, startPosition
 	self.Header.InputBegan:Connect(function(input)
 		if Util.isPress(input) then
+			self.Focused:Fire()
 			dragging = true
 			startPointer = Util.pointer(input)
 			startPosition = Vector2.new(self.Holder.Position.X.Offset, self.Holder.Position.Y.Offset)
 			self.ctx.Popups:CloseAll()
 		end
 	end)
-	UserInputService.InputChanged:Connect(function(input)
+	self.Maid:Give(UserInputService.InputChanged:Connect(function(input)
 		if dragging and Util.isMove(input) then
 			local target = self:_clamp(startPosition + (Util.pointer(input) - startPointer))
 			self.Holder.Position = UDim2.fromOffset(target.X, target.Y)
 		end
-	end)
-	UserInputService.InputEnded:Connect(function(input)
+	end))
+	self.Maid:Give(UserInputService.InputEnded:Connect(function(input)
 		if Util.isPress(input) then
 			dragging = false
 		end
+	end))
+end
+
+function Window:SetPrivacyMode(enabled)
+	self.PrivacyMode = enabled
+	if self.ProfileName then
+		self.ProfileName.Text = enabled and "User" or self._profileText
+		self.ProfileAvatar.Visible = not enabled
+		self.ProfileAvatar.Image = enabled and "" or self._profileImage
+		self.AnonymousAvatar.Visible = enabled
+	end
+end
+
+function Window:SetSize(width, height)
+	local viewport = self.ctx.Gui.AbsoluteSize
+	local scale = math.max(self.Scale.Scale, 0.01)
+	local position = self.Holder.Position
+	local maxWidth = math.max(200, (viewport.X - position.X.Offset - 8) / scale)
+	local maxHeight = math.max(180, (viewport.Y - position.Y.Offset - 8) / scale)
+	self.Width = math.clamp(width, math.min(480, maxWidth), maxWidth)
+	self.Height = math.clamp(height, math.min(320, maxHeight), maxHeight)
+	self.Holder.Size = UDim2.fromOffset(self.Width, self.Minimized and HEADER or self.Height)
+	self.ctx.Popups:CloseAll()
+	self:_renderTabs(true)
+end
+
+function Window:_setupResize()
+	local handle = Util.button({
+		Name = "ResizeHandle", AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -5, 1, -5), Size = UDim2.fromOffset(24, 24),
+		ZIndex = 60, Parent = self.Body,
+	})
+	local glyph = Icons.create("resize", 18, Color3.new(1, 1, 1), {
+		Position = UDim2.fromOffset(5, 5), ZIndex = 60, Transparency = 0.45, Parent = handle,
+	})
+	self.ResizeHandle = handle
+	local dragging, startPointer, startSize
+	handle.MouseEnter:Connect(function() Icons.tween(glyph, "Fast", Color3.new(1, 1, 1), 0.05) end)
+	handle.MouseLeave:Connect(function()
+		if not dragging then Icons.tween(glyph, "Fast", Color3.new(1, 1, 1), 0.45) end
 	end)
+	handle.InputBegan:Connect(function(input)
+		if Util.isPress(input) then
+			dragging = true
+			startPointer = Util.pointer(input)
+			startSize = Vector2.new(self.Width, self.Height)
+			self.Focused:Fire()
+			self.ctx.Popups:CloseAll()
+		end
+	end)
+	self.Maid:Give(UserInputService.InputChanged:Connect(function(input)
+		if dragging and Util.isMove(input) then
+			local delta = (Util.pointer(input) - startPointer) / math.max(self.Scale.Scale, 0.01)
+			self:SetSize(startSize.X + delta.X, startSize.Y + delta.Y)
+		end
+	end))
+	self.Maid:Give(UserInputService.InputEnded:Connect(function(input)
+		if dragging and Util.isPress(input) then
+			dragging = false
+			Icons.tween(glyph, "Fast", Color3.new(1, 1, 1), 0.45)
+		end
+	end))
 end
 
 function Window:Center()
 	local viewport = self.ctx.Gui.AbsoluteSize
 	local scale = self.Scale.Scale
-	local x = (viewport.X - WIDTH * scale) / 2
+	local x = (viewport.X - self.Width * scale) / 2
 	local top = self.ctx.ToolbarBottom and self.ctx.ToolbarBottom() + 14 or 72
-	local y = math.max(top, (viewport.Y - HEIGHT * scale) / 2)
+	local y = math.max(top, (viewport.Y - self.Height * scale) / 2)
+	local offset = ((self.Index or 1) - 1) % 5 * 28
+	x += offset
+	y += offset
 	local target = self:_clamp(Vector2.new(x, y))
 	self.Holder.Position = UDim2.fromOffset(target.X, target.Y)
 end
@@ -453,7 +526,7 @@ function Window:_renderTabs(instant)
 		return
 	end
 	-- Convert absolute coordinates back into unscaled window space.
-	local ratio = self.Tabs.AbsoluteSize.X / WIDTH
+	local ratio = self.Tabs.AbsoluteSize.X / self.Width
 	if ratio <= 0 then
 		return
 	end
@@ -547,6 +620,7 @@ function Window:Open()
 		return
 	end
 	self.IsOpen = true
+	self.Focused:Fire()
 	self._version += 1
 	local holder = self.Holder
 	if not self._placed then
@@ -585,9 +659,12 @@ end
 function Window:SetMinimized(minimized)
 	self.Minimized = minimized
 	self.ctx.Popups:CloseAll()
-	Motion.tween(self.Holder, "Smooth", {
-		Size = UDim2.fromOffset(WIDTH, minimized and HEADER or HEIGHT),
-	})
+	-- Resize immediately: tweening a CanvasGroup's render target can leave it cropped.
+	self.Holder.Size = UDim2.fromOffset(self.Width, minimized and HEADER or self.Height)
+	if self.ResizeHandle then self.ResizeHandle.Visible = not minimized end
+	self.Tabs.Visible = not minimized
+	self.PageHolder.Visible = not minimized
+	self.Body.Footer.Visible = not minimized
 	-- Swap the glyph between "minimise" and "restore".
 	local ref = self._minimizeRef
 	local parent = ref.Icon.Parent
@@ -601,6 +678,14 @@ function Window:SetMinimized(minimized)
 	local position = self.Holder.Position
 	local target = self:_clamp(Vector2.new(position.X.Offset, position.Y.Offset))
 	self.Holder.Position = UDim2.fromOffset(target.X, target.Y)
+end
+
+function Window:Destroy()
+	self.Maid:Clean()
+	self.Holder:Destroy()
+	self.Focused:Destroy()
+	self.Closed:Destroy()
+	self.PageChanged:Destroy()
 end
 
 return Window

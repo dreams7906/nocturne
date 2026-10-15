@@ -59,7 +59,7 @@ Priority:AddToggle("PreferBosses", { Title = "Prefer bosses", Default = true })
 Priority:AddToggle("SkipDowned", { Title = "Skip downed enemies", Default = true })
 Priority:AddDropdown("Indicator", { Title = "Indicator style", Values = { "Ring", "Brackets", "Arrow", "Hidden" }, Default = 2 })
 
-local Abilities = Combat:AddSection({ Title = "Abilities", Side = "Left" })
+local Abilities = Combat:AddSection({ Title = "Abilities", Tabs = { "Bindings", "Behavior" }, Side = "Left" })
 Abilities:AddKeybind("Ability1", { Title = "Primary ability", Default = Enum.KeyCode.E })
 Abilities:AddKeybind("Ability2", { Title = "Secondary ability", Default = Enum.KeyCode.R })
 Abilities:AddKeybind("Ultimate", {
@@ -75,7 +75,8 @@ Abilities:AddKeybind("Dodge", {
 	Default = Enum.KeyCode.V,
 	Tooltip = "Try binding Q: lock-on already uses it, so the key is refused.",
 })
-Abilities:AddToggle("QuickCast", { Title = "Quick cast", Description = "Cast on key press instead of release." })
+local AbilityBehavior = Abilities:Tab("Behavior")
+AbilityBehavior:AddToggle("QuickCast", { Title = "Quick cast", Description = "Cast on key press instead of release." })
 
 local Feedback = Combat:AddSection({ Title = "Feedback", Side = "Right" })
 Feedback:AddToggle("HitMarkers", { Title = "Hit markers", Default = true })

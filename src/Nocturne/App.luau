@@ -56,6 +56,7 @@ function Nocturne.new(options)
 		Name = name,
 		IgnoreGuiInset = true,
 		ResetOnSpawn = false,
+		Enabled = true,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = options.DisplayOrder or 50,
 		Parent = parent,
@@ -116,6 +117,9 @@ function Nocturne.new(options)
 		Keybinds = ctx.Keybinds,
 		Notifications = notifications,
 		Pages = {},
+		Windows = {},
+		_windowOptions = options,
+		PrivacyMode = options.PrivacyMode == true,
 		UserScale = options.Scale or 1,
 		BlurEnabled = options.Blur == true,
 		CollapseOnReselect = options.CollapseOnReselect ~= false,
@@ -129,24 +133,17 @@ function Nocturne.new(options)
 		return self.Toolbar:Bottom()
 	end
 	self.Window = Window.new(ctx, options)
+	self:_attachWindow(self.Window)
 	self.Watermark = Watermark.new(ctx, options)
 	self.KeybindList = KeybindList.new(ctx)
 	self.Configs = ConfigManager.new(ctx.State)
+	gui.Destroying:Once(function()
+		self:Destroy()
+	end)
 
 	self.Toolbar.Clicked:Connect(function(page)
 		self:_fromToolbar(page)
 	end)
-	self.Window.PageChanged:Connect(function(page)
-		if self.Window.IsOpen then
-			self.Toolbar:SetActive(page)
-		end
-	end)
-	self.Window.Closed:Connect(function()
-		self.Toolbar:SetActive(nil)
-		self:_applyBlur(false)
-		self.Closed:Fire()
-	end)
-
 	self._menuBind = ctx.Keybinds:Register({
 		Name = "Menu",
 		Key = options.MenuKey and (typeof(options.MenuKey) == "EnumItem" and options.MenuKey.Name or options.MenuKey)
@@ -171,14 +168,55 @@ end
 -- Navigation ----------------------------------------------------------------
 
 function App:Page(opts)
-	local page = Page.new(self.ctx, self.Window.PageHolder, opts)
-	table.insert(self.Pages, page)
-	self.Window:AddPage(page)
-	self.Toolbar:AddItem(page)
-	if #self.Pages == 1 then
-		self.Window:Select(page, true)
+	local window = self.Windows[1]
+	if #self.Pages > 0 then
+		local options = table.clone(self._windowOptions)
+		options.Subtitle = opts.Name
+		options.PrivacyMode = self.PrivacyMode
+		window = Window.new(self.ctx, options)
+		self:_attachWindow(window)
+		window:SetScale(self.ctx:GetScale())
 	end
+	local page = Page.new(self.ctx, window.PageHolder, opts)
+	page.Window = window
+	table.insert(self.Pages, page)
+	window:AddPage(page)
+	self.Toolbar:AddItem(page)
+	window:Select(page, true)
 	return page
+end
+
+function App:_attachWindow(window)
+	table.insert(self.Windows, window)
+	window.Index = #self.Windows
+	window.Focused:Connect(function()
+		self:_focusWindow(window)
+	end)
+	window.Closed:Connect(function()
+		self:_refreshDock()
+		self:_applyBlur(self:IsOpen())
+		self.Closed:Fire()
+	end)
+end
+
+function App:_focusWindow(window)
+	self.Window = window
+	-- Keep the focused window above its siblings without overtaking the dock.
+	for _, sibling in ipairs(self.Windows) do
+		sibling.Holder.ZIndex = sibling == window and 12 or 10
+	end
+	self:_refreshDock()
+end
+
+function App:_refreshDock()
+	local opened = {}
+	for _, window in ipairs(self.Windows) do
+		if window.IsOpen and window.Current then
+			opened[window.Current] = true
+		end
+	end
+	self.Toolbar:SetOpenPages(opened)
+	self.Toolbar:SetActive(self.Window.IsOpen and self.Window.Current or nil)
 end
 
 function App:GetPage(name)
@@ -191,54 +229,65 @@ function App:GetPage(name)
 end
 
 function App:_fromToolbar(page)
-	local window = self.Window
-	if window.IsOpen and window.Current == page and not window.Minimized then
+	local window = page.Window
+	if window.IsOpen and not window.Minimized then
 		if self.CollapseOnReselect then
-			self:Close()
+			window:Close()
 		end
 		return
 	end
 	if window.Minimized then
 		window:SetMinimized(false)
 	end
-	window:Select(page)
+	self:_focusWindow(window)
 	self:Open()
 end
 
 function App:SelectPage(name)
 	local page = type(name) == "table" and name or self:GetPage(name)
 	if page then
-		self.Window:Select(page)
+		self:_focusWindow(page.Window)
+		page.Window:Select(page)
 	end
 end
 
 function App:Open(pageName)
+	self.Gui.Enabled = true
 	if pageName then
 		self:SelectPage(pageName)
 	end
-	if self.Window.IsOpen then
-		return
-	end
 	self.Window:Open()
-	self.Toolbar:SetActive(self.Window.Current)
+	self:_refreshDock()
 	self:_applyBlur(true)
 	self.Opened:Fire()
 end
 
 function App:Close()
-	self.Window:Close()
+	self.Gui.Enabled = false
+	self.ctx.Popups:CloseAll()
+	self.ctx.Tooltip:Hide()
+	self:_applyBlur(false)
 end
 
 function App:Toggle()
-	if self.Window.IsOpen then
+	if self.Gui.Enabled then
 		self:Close()
 	else
-		self:Open()
+		self.Gui.Enabled = true
+		if not self:IsOpen() then
+			self:Open()
+		else
+			self:_applyBlur(true)
+		end
 	end
 end
 
 function App:IsOpen()
-	return self.Window.IsOpen
+	if not self.Gui.Enabled then return false end
+	for _, window in ipairs(self.Windows) do
+		if window.IsOpen then return true end
+	end
+	return false
 end
 
 function App:Notify(opts)
@@ -283,17 +332,34 @@ function App:SetScale(scale)
 	self:_applyScale()
 end
 
+function App:SetPrivacyMode(enabled)
+	self.PrivacyMode = enabled == true
+	for _, window in ipairs(self.Windows) do
+		window:SetPrivacyMode(self.PrivacyMode)
+	end
+	local player = Players.LocalPlayer
+	self.Watermark.Name.Text = self.PrivacyMode and "User" or (player and player.DisplayName or "Player")
+	self.Watermark:_resize()
+end
+
 -- Fits the window on small screens (phones) on top of the user's choice.
 function App:_applyScale()
 	local viewport = self.Gui.AbsoluteSize
 	if viewport.X <= 0 or viewport.Y <= 0 then
 		return
 	end
-	local fit = math.min((viewport.X - 32) / Window.Width, (viewport.Y - 96) / Window.Height, 1)
-	local scale = self.UserScale * math.clamp(fit, 0.45, 1)
+	local width, height = Window.Width, Window.Height
+	for _, window in ipairs(self.Windows) do
+		width = math.max(width, window.Width)
+		height = math.max(height, window.Height)
+	end
+	local fit = math.min((viewport.X - 32) / width, (viewport.Y - 96) / height)
+	local scale = math.max(0.1, math.min(self.UserScale, fit))
 	local chrome = self.UserScale * math.clamp(viewport.X / 520, 0.7, 1)
 	self.ctx._scale = scale
-	self.Window:SetScale(scale)
+	for _, window in ipairs(self.Windows) do
+		window:SetScale(scale)
+	end
 	self.Toolbar:SetScale(chrome)
 	self.Notifications:SetScale(chrome)
 	self.Watermark:SetScale(chrome)
@@ -303,7 +369,7 @@ end
 
 function App:SetBlur(enabled)
 	self.BlurEnabled = enabled
-	self:_applyBlur(enabled and self.Window.IsOpen)
+	self:_applyBlur(enabled and self:IsOpen())
 end
 
 function App:_applyBlur(on)
@@ -322,7 +388,7 @@ function App:_applyBlur(on)
 		Motion.tween(blur, "Smooth", { Size = 12 })
 	elseif blur then
 		Motion.tween(blur, "Normal", { Size = 0 }, function()
-			if self._blur == blur and not (self.BlurEnabled and self.Window.IsOpen) then
+			if self._blur == blur and not (self.BlurEnabled and self:IsOpen()) then
 				blur:Destroy()
 				self._blur = nil
 			end
@@ -374,19 +440,28 @@ function App:SetTooltips(enabled)
 end
 
 function App:ResetPosition()
-	self.Window:Center()
+	for _, window in ipairs(self.Windows) do
+		window:Center()
+	end
 end
 
 function App:Destroy()
+	if self._destroyed then return end
+	self._destroyed = true
 	for _, connection in ipairs(self._connections) do
 		connection:Disconnect()
 	end
 	self.ctx.Keybinds:Destroy()
 	self.ctx.Popups:Destroy()
+	for _, window in ipairs(self.Windows) do
+		window:Destroy()
+	end
 	if self._blur then
 		self._blur:Destroy()
 	end
 	self.Gui:Destroy()
+	self.Opened:Destroy()
+	self.Closed:Destroy()
 end
 
 return Nocturne

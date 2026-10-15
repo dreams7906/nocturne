@@ -357,6 +357,18 @@ Inst.__index = function(self, key)
 	if key == "AbsolutePosition" then
 		return v2(400, 300)
 	end
+	if key == "AbsoluteContentSize" then
+		local height, width = 0, 0
+		local parent = props.Parent
+		for _, child in ipairs(parent and parent:GetChildren() or {}) do
+			if child:IsA("GuiObject") and child.Visible ~= false then
+				local size = child.AbsoluteSize
+				height += size.Y
+				width = math.max(width, size.X)
+			end
+		end
+		return v2(width, height)
+	end
 	if DEFAULTS[key] ~= nil then
 		return DEFAULTS[key]
 	end
@@ -431,10 +443,16 @@ function methods:GetDescendants()
 	walk(self)
 	return out
 end
-function methods:FindFirstChild(name)
+function methods:FindFirstChild(name, recursive)
 	for _, child in ipairs(self._children) do
 		if child._props.Name == name then
 			return child
+		end
+	end
+	if recursive then
+		for _, child in ipairs(self._children) do
+			local found = child:FindFirstChild(name, true)
+			if found then return found end
 		end
 	end
 	return nil

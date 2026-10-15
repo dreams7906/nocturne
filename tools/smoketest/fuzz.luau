@@ -42,23 +42,142 @@ print("window open after start: " .. tostring(app:IsOpen()))
 -- Dock: every icon, then the active icon again (collapse), then reopen.
 for _, item in ipairs(app.Toolbar.Items) do
 	step("dock " .. item.Page.Name, function()
-		if app.Window.Current == item.Page and app:IsOpen() then
-			app:Close() -- clicking the already-active icon would collapse instead
+		if item.Page.Window.IsOpen then
+			item.Page.Window:Close()
 			Mock.run(0.5)
 		end
 		click(item.Button)
 		assert(app.Window.Current == item.Page, "dock did not switch to " .. item.Page.Name)
 		assert(app:IsOpen(), "window not open after dock click")
+		assert(item.Page.Window.IsOpen, "category window not open")
 	end)
 end
 step("dock reselect collapses", function()
 	click(app.Toolbar.Items[#app.Toolbar.Items].Button)
-	assert(not app:IsOpen(), "reselecting the active icon should close the window")
+	assert(not app.Pages[#app.Pages].Window.IsOpen, "reselecting should close only that window")
+	assert(app.Pages[1].Window.IsOpen, "another category window should remain open")
 	assert(app.Toolbar.Active == nil, "dock highlight should clear when closed")
 end)
-step("menu key reopens", function()
+step("menu key hides and restores all windows and dock", function()
+	local first = app.Pages[1].Window
+	local position = first.Holder.Position
 	UIS.InputBegan:Fire(Mock.input("Keyboard", "RightControl"), false)
-	assert(app:IsOpen(), "menu key did not open the window")
+	assert(not gui.Enabled, "menu key must hide the entire ScreenGui, including the dock")
+	assert(first.IsOpen, "hiding should preserve each window's open state")
+	UIS.InputBegan:Fire(Mock.input("Keyboard", "RightControl"), false)
+	assert(gui.Enabled and app:IsOpen(), "menu key did not restore the windows")
+	assert(first.Holder.Position == position, "hide/show moved the window")
+end)
+
+step("minimize and restore full content", function()
+	local window = app.Pages[1].Window
+	window:SetMinimized(true)
+	assert(not window.PageHolder.Visible and not window.Body.Footer.Visible, "minimized content overlaps the header")
+	window:SetMinimized(false)
+	assert(window.Holder.Size.Y.Offset == 520 and window.PageHolder.Visible, "restored window is cropped")
+end)
+
+step("color picker tracks exact screen position at reduced scale", function()
+	app:SetScale(0.7)
+	local swatch = Library.Options.HudAccent.Row:FindFirstChild("Swatch", true)
+	assert(swatch, "HUD accent swatch missing")
+	click(swatch)
+	Mock.run(0.4)
+	local popup = gui.Overlay:FindFirstChild("ColorPopup")
+	local sv = popup.Body.SaturationValue
+	sv.AbsoluteSize = Vector2.new(126, 78.4)
+	local point = sv.AbsolutePosition + Vector2.new(sv.AbsoluteSize.X * 0.25, sv.AbsoluteSize.Y * 0.75)
+	sv.InputBegan:Fire(Mock.input("MouseButton1", nil, point))
+	assert(math.abs(sv.Cursor.Position.X.Scale - 0.25) < 1e-6, "saturation cursor offset")
+	assert(math.abs(sv.Cursor.Position.Y.Scale - 0.75) < 1e-6, "value cursor offset: GUI inset was added")
+	local moved = sv.AbsolutePosition + Vector2.new(sv.AbsoluteSize.X * 0.8, sv.AbsoluteSize.Y * 0.2)
+	UIS.InputChanged:Fire(Mock.input("MouseMovement", nil, moved))
+	assert(math.abs(sv.Cursor.Position.X.Scale - 0.8) < 1e-6 and math.abs(sv.Cursor.Position.Y.Scale - 0.2) < 1e-6, "drag cursor drift")
+	UIS.InputEnded:Fire(Mock.input("MouseButton1"))
+	local hue = popup.Body.Hue
+	local huePoint = hue.AbsolutePosition + Vector2.new(hue.AbsoluteSize.X * 0.6, 0)
+	hue.InputBegan:Fire(Mock.input("Touch", nil, huePoint))
+	assert(math.abs(hue.Cursor.Position.X.Scale - 0.6) < 1e-6, "touch hue cursor offset")
+	UIS.InputEnded:Fire(Mock.input("Touch"))
+	app.ctx.Popups:CloseAll()
+	app:SetScale(1)
+end)
+
+step("UI scale can grow and still fits a small viewport", function()
+	app:SetScale(1.3)
+	assert(math.abs(app.ctx:GetScale() - 1.3) < 1e-6, "large-screen scale was capped at 100%")
+	gui.AbsoluteSize = Vector2.new(640, 480)
+	app:_applyScale()
+	assert(680 * app.ctx:GetScale() <= 608 and 520 * app.ctx:GetScale() <= 384, "window exceeds the viewport")
+	gui._props.AbsoluteSize = nil
+	app:SetScale(1)
+end)
+
+step("resize handle changes only its own window", function()
+	local window = app.Pages[1].Window
+	window.ResizeHandle.InputBegan:Fire(Mock.input("MouseButton1", nil, Vector2.new(700, 600)))
+	UIS.InputChanged:Fire(Mock.input("MouseMovement", nil, Vector2.new(800, 680)))
+	UIS.InputEnded:Fire(Mock.input("MouseButton1"))
+	assert(window.Width == 780 and window.Height == 600, "resize drag did not match pointer movement")
+	assert(app.Pages[2].Window.Width == 680, "resizing changed another window")
+	window:SetMinimized(true)
+	assert(not window.ResizeHandle.Visible, "resize handle visible while minimized")
+	window:SetMinimized(false)
+	assert(window.Holder.Size.X.Offset == 780 and window.Holder.Size.Y.Offset == 600, "restore lost the resized dimensions")
+	window:SetSize(10000, 10000)
+	local viewport = gui.AbsoluteSize
+	assert(window.Width <= viewport.X and window.Height <= viewport.Y, "resize exceeded screen bounds")
+	window:SetSize(680, 520)
+end)
+
+step("privacy masks every profile and restores it", function()
+	local original = app.Windows[1].ProfileName.Text
+	app:SetPrivacyMode(true)
+	for _, window in ipairs(app.Windows) do
+		assert(window.ProfileName.Text == "User" and window.ProfileAvatar.Image == "" and window.AnonymousAvatar.Visible, "profile not anonymous")
+	end
+	assert(app.Watermark.Name.Text == "User", "watermark exposed the username")
+	app:SetPrivacyMode(false)
+	assert(app.Windows[1].ProfileName.Text == original and app.Windows[1].ProfileAvatar.Visible, "profile not restored")
+end)
+
+step("all generated icons map to uploaded assets and keep loading fallbacks", function()
+	local Icons = Library.Icons
+	local count = 0
+	for name in pairs(Icons.Glyphs) do
+		local asset = Icons.Assets[name]
+		assert(asset and string.match(asset.Image, "^rbxassetid://%d+$"), "missing uploaded asset for " .. name)
+		local icon = Icons.create(name, 20, Color3.new(1, 1, 1), { Parent = gui.Overlay })
+		assert(icon:IsA("ImageLabel") and icon.Image == asset.Image, "icon did not use image asset")
+		assert(icon.Fallback.Visible, "unloaded icon has no fallback")
+		Icons.tint(icon, Color3.fromRGB(120, 180, 240), 0.2)
+		assert(icon.ImageTransparency == 1, "pending image must stay hidden behind its fallback")
+		if asset.SheetSize then
+			icon.ContentImageSize = asset.SheetSize / 2
+		end
+		icon._props.IsLoaded = true -- Roblox can finish loading without a property signal.
+		Mock.Run.Heartbeat:Fire(0.2)
+		assert(not icon:FindFirstChild("Fallback"), "fallback remained over the loaded artwork")
+		assert(icon.ImageTransparency == 0.2, "loaded image lost its requested transparency")
+		if asset.SheetSize then
+			assert(icon.ImageRectSize == asset.RectSize / 2, "sprite region did not follow decoded texture size")
+		end
+		icon:Destroy()
+		count += 1
+	end
+	assert(count == 29, "unexpected generated icon count")
+end)
+
+step("section sub-tabs can be created and selected dynamically", function()
+	local section = Library.Window.Tabs[1]:AddSection({ Title = "Groups", Tabs = { "General", "Advanced" } })
+	section:Tab("Advanced"):AddToggle("NestedExample", { Title = "Nested toggle" })
+	local extra = section:AddTab("Extra")
+	extra:AddSlider("NestedSlider", { Title = "Nested slider", Min = 0, Max = 10 })
+	section:SelectTab("Extra")
+	assert(extra.Container.Frame.Visible and not section.Container.Frame.Visible, "sub-tab selection did not isolate content")
+	section:SelectTab("missing")
+	assert(extra.Container.Frame.Visible, "unknown sub-tab hid the content")
+	section:SelectTab("General")
 end)
 
 -- Click every button on every page.

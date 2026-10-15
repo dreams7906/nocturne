@@ -122,6 +122,7 @@ function ColorPicker.Swatch(ctx, parent, opts)
 		Util.corner(black, 6)
 		Util.new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(1, 0), Parent = black })
 		local svCursor = Util.frame({
+			Name = "Cursor",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Size = UDim2.fromOffset(10, 10),
 			ZIndex = 5,
@@ -142,6 +143,7 @@ function ColorPicker.Swatch(ctx, parent, opts)
 		Util.corner(hueBar, UDim.new(1, 0))
 		Util.new("UIGradient", { Color = hueSequence(), Parent = hueBar })
 		local hueCursor = Util.frame({
+			Name = "Cursor",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Size = UDim2.fromOffset(6, 14),
 			BackgroundTransparency = 0,
@@ -240,12 +242,17 @@ function ColorPicker.Swatch(ctx, parent, opts)
 		}
 
 		local function updateFrom(point)
+			if not open then
+				return
+			end
 			if dragging == "sv" then
 				local position, size = sv.AbsolutePosition, sv.AbsoluteSize
+				if size.X <= 0 or size.Y <= 0 then return end
 				sat = math.clamp((point.X - position.X) / size.X, 0, 1)
 				val = 1 - math.clamp((point.Y - position.Y) / size.Y, 0, 1)
 			elseif dragging == "hue" then
 				local position, size = hueBar.AbsolutePosition, hueBar.AbsoluteSize
+				if size.X <= 0 then return end
 				hue = math.clamp((point.X - position.X) / size.X, 0, 0.999)
 			end
 			commit(false)
@@ -300,19 +307,19 @@ function ColorPicker.Swatch(ctx, parent, opts)
 		end
 		open = true
 		ctx.Popups:Open(popup.Handle)
-		local scale = ctx:GetScale()
-		local holder = popup.Surface.Holder
-		local position, size = root.AbsolutePosition, root.AbsoluteSize
 		local viewport = ctx.Gui.AbsoluteSize
+		local scale = math.min(ctx:GetScale(), (viewport.X - 16) / WIDTH, (viewport.Y - 16) / HEIGHT)
+		local holder = popup.Surface.Holder
+		local position = root.AbsolutePosition - ctx.Overlay.AbsolutePosition
+		local size = root.AbsoluteSize
 		local below = position.Y + size.Y + 6 + HEIGHT * scale <= viewport.Y - 8
-		local x = math.clamp(position.X + size.X - WIDTH * scale, 8, viewport.X - WIDTH * scale - 8)
+		local x = math.clamp(position.X + size.X - WIDTH * scale, 8, math.max(8, viewport.X - WIDTH * scale - 8))
 		popup.Scale.Scale = scale
 		holder.AnchorPoint = Vector2.new(0, below and 0 or 1)
-		local y = below and (position.Y + size.Y + 6) or (position.Y - 6)
-		holder.Position = UDim2.fromOffset(x, y + (below and -6 or 6))
+		local y = below and (position.Y + size.Y + 6) or math.max(HEIGHT * scale + 8, position.Y - 6)
+		holder.Position = UDim2.fromOffset(x, y)
 		holder.Visible = true
 		popup.Surface.Body.GroupTransparency = 1
-		Motion.tween(holder, "Normal", { Position = UDim2.fromOffset(x, y) })
 		popup.Surface.SetAlpha(0, "Normal")
 		commit(true)
 	end

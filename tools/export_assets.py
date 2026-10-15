@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import math
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ICONS = ROOT / "src" / "Nocturne" / "Icons" / "Icons.luau"
@@ -55,6 +56,12 @@ def shape_svg(shape, color: str, width: float, clip_id: list[int]) -> str:
     stroke = f'fill="none" stroke="{color}" stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round"'
     if kind == "line":
         return f'<line x1="{n[0]}" y1="{n[1]}" x2="{n[2]}" y2="{n[3]}" {stroke}/>'
+    if kind == "arc":
+        cx, cy, radius, start, end = n
+        x1, y1 = cx + math.cos(math.radians(start)) * radius, cy + math.sin(math.radians(start)) * radius
+        x2, y2 = cx + math.cos(math.radians(end)) * radius, cy + math.sin(math.radians(end)) * radius
+        large = 1 if abs(end - start) > 180 else 0
+        return f'<path d="M {x1} {y1} A {radius} {radius} 0 {large} 1 {x2} {y2}" {stroke}/>'
     if kind == "ring":
         return f'<circle cx="{n[0]}" cy="{n[1]}" r="{n[2]}" {stroke}/>'
     if kind == "dot":
@@ -95,7 +102,7 @@ def parse_presets() -> dict[str, dict[str, str]]:
 
 
 def dock_svg(glyphs, theme) -> str:
-    button, gap, pad = 34, 4, 6
+    button, gap, pad = 34, 7, 10
     width = pad * 2 + len(DOCK) * button + (len(DOCK) - 1) * gap
     height = button + pad * 2
     margin = 24
@@ -107,7 +114,7 @@ def dock_svg(glyphs, theme) -> str:
         '<stop offset="0" stop-color="#fff" stop-opacity="0.07"/><stop offset="1" stop-color="#000" stop-opacity="0.12"/></linearGradient>',
         '<linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">'
         f'<stop offset="0" stop-color="{theme["BorderStrong"]}"/><stop offset="1" stop-color="{theme["Border"]}"/></linearGradient>',
-        '<filter id="shadow" x="-20%" y="-50%" width="140%" height="220%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity="0.45"/></filter>',
+        '<filter id="shadow" x="-20%" y="-50%" width="140%" height="220%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.15"/></filter>',
         "</defs>",
         f'<rect width="100%" height="100%" fill="#3a3d45"/>',
         f'<g transform="translate({margin} {margin})">',
@@ -117,8 +124,8 @@ def dock_svg(glyphs, theme) -> str:
     ]
     active = 0
     ax = pad + active * (button + gap)
-    parts.append(f'<rect x="{ax}" y="{pad}" width="{button}" height="{button}" rx="10" fill="{theme["Hover"]}" stroke="{theme["BorderStrong"]}" stroke-opacity="0.65"/>')
-    parts.append(f'<circle cx="{ax + button / 2}" cy="{pad + button - 5}" r="2" fill="{theme["Accent"]}"/>')
+    parts.append(f'<rect x="{ax}" y="{pad}" width="{button}" height="{button}" rx="10" fill="{theme["Hover"]}" fill-opacity="0.3" stroke="{theme["BorderStrong"]}" stroke-opacity="0.15"/>')
+    parts.append(f'<circle cx="{ax + button / 2}" cy="{pad + button - 2}" r="1.5" fill="{theme["Text"]}"/>')
     for index, name in enumerate(DOCK):
         x = pad + index * (button + gap) + (button - 18) / 2
         y = pad + (button - 18) / 2 - (1.5 if index == active else 0)

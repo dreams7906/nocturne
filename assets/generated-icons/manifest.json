@@ -1,0 +1,40 @@
+{
+  "assets": {
+    "nocturne": "94383796334112",
+    "combat": "133149767794003",
+    "visuals": "133395560601361",
+    "world": "137930732018683",
+    "player": "132978357840863",
+    "settings": "135452470649058",
+    "configs": "132227538337264",
+    "utilities": "132705411270408",
+    "misc": "71432307544650",
+    "controls": "102937966099946"
+  },
+  "controls": {
+    "columns": 5,
+    "rows": 4,
+    "names": [
+      "resize",
+      "chevron",
+      "check",
+      "close",
+      "minimize",
+      "maximize",
+      "search",
+      "keyboard",
+      "save",
+      "load",
+      "trash",
+      "pencil",
+      "plus",
+      "copy",
+      "bell",
+      "info",
+      "warning",
+      "success",
+      "palette",
+      "sparkle"
+    ]
+  }
+}

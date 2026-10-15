@@ -17,10 +17,10 @@ local Toolbar = {}
 Toolbar.__index = Toolbar
 
 local BUTTON = 34
-local GAP = 4
-local PAD = 6
+local GAP = 7
+local PAD = 10
 local TOP = 12
-local ICON = 18
+local ICON = 20
 
 function Toolbar.new(ctx)
 	local theme = ctx.Theme
@@ -28,22 +28,23 @@ function Toolbar.new(ctx)
 		ctx = ctx,
 		Items = {},
 		Active = nil,
+		OpenPages = {},
 		Clicked = Signal.new(),
 	}, Toolbar)
 
 	local surface = Util.surface(ctx, {
 		Name = "Toolbar",
-		Radius = 15,
+		Radius = 14,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, TOP),
 		Size = UDim2.fromOffset(PAD * 2, BUTTON + PAD * 2),
-		ShadowLayers = 6,
+		ShadowLayers = 2,
 		ShadowSpread = 3,
 		ShadowOffset = 6,
-		ShadowTransparency = 0.92,
-		GlossStrength = 0.16,
+		ShadowTransparency = 0.97,
+		GlossStrength = 0.03,
 		FillTransparency = function(tokens)
-			return math.clamp(tokens.Transparency + 0.08, 0, 0.6)
+			return math.clamp(tokens.Transparency + 0.16, 0, 0.6)
 		end,
 		ZIndex = 20,
 		Parent = ctx.Gui,
@@ -136,7 +137,9 @@ function Toolbar:Bottom()
 end
 
 function Toolbar:SetScale(scale)
-	self.Scale.Scale = scale
+	self._requestedScale = scale
+	local width = self.Holder.Size.X.Offset
+	self.Scale.Scale = math.min(scale, math.max(0.1, (self.ctx.Gui.AbsoluteSize.X - 24) / math.max(width, 1)))
 end
 
 function Toolbar:_offset(index)
@@ -146,10 +149,17 @@ end
 function Toolbar:_render(instant)
 	local t = self.ctx.Theme.Tokens
 	for _, item in ipairs(self.Items) do
-		local active = item.Page == self.Active
+		local active = self.OpenPages[item.Page] == true
 		local color = active and t.Text or (item.Hovered and t.TextDim or t.TextMuted)
 		Icons.tween(item.Icon, instant and "Instant" or "Fast", color)
+		Motion.tween(item.Dot, instant and "Instant" or "Fast", { BackgroundTransparency = active and 0 or 1, BackgroundColor3 = t.Text })
+		Motion.tween(item.Button, instant and "Instant" or "Fast", { BackgroundColor3 = t.Hover, BackgroundTransparency = item.Hovered and 0.45 or 1 })
 	end
+end
+
+function Toolbar:SetOpenPages(pages)
+	self.OpenPages = pages
+	self:_render(false)
 end
 
 function Toolbar:_showHint(item)
@@ -182,13 +192,20 @@ function Toolbar:AddItem(page)
 		Parent = self.Row,
 	})
 	local scale = Util.new("UIScale", { Parent = button })
+	Util.corner(button, 8)
 	local icon = Icons.create(page.Icon, ICON, self.ctx.Theme.Tokens.TextMuted, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, -2),
 		ZIndex = 3,
 		Parent = button,
 	})
-	local item = { Page = page, Button = button, Icon = icon, Scale = scale, Index = index, Hovered = false }
+	local dot = Util.frame({
+		Name = "OpenDot", AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -1), Size = UDim2.fromOffset(3, 3),
+		BackgroundTransparency = 1, ZIndex = 4, Parent = button,
+	})
+	Util.corner(dot, UDim.new(1, 0))
+	local item = { Page = page, Button = button, Icon = icon, Dot = dot, Scale = scale, Index = index, Hovered = false }
 	table.insert(self.Items, item)
 
 	button.MouseEnter:Connect(function()
@@ -215,6 +232,7 @@ function Toolbar:AddItem(page)
 
 	local width = PAD * 2 + index * BUTTON + (index - 1) * GAP
 	self.Holder.Size = UDim2.fromOffset(width, BUTTON + PAD * 2)
+	self:SetScale(self._requestedScale or 1)
 	self:_render(true)
 	return item
 end
@@ -239,10 +257,9 @@ function Toolbar:SetActive(page)
 		Motion.tween(indicator, "Smooth", {
 			Position = target,
 			Size = UDim2.fromOffset(BUTTON, BUTTON),
-			BackgroundTransparency = 0,
+			BackgroundTransparency = 0.7,
 		})
-		Motion.tween(self.IndicatorStroke, "Smooth", { Transparency = 0.35 })
-		Motion.tween(self.Dot, "Smooth", { BackgroundTransparency = 0 })
+		Motion.tween(self.IndicatorStroke, "Smooth", { Transparency = 0.85 })
 		self._shown = true
 	elseif self._shown then
 		self._shown = false

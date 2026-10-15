@@ -1,6 +1,6 @@
 # Design guide
 
-Nocturne aims for a compact, dark, slightly glossy desktop-app feel. Depth comes from layered shadows and top-lit gradients, not from bright color.
+Nocturne uses the supplied charcoal glass-panel references: flat square toggles, quiet grey fields, translucent gradient surfaces, white rim highlights and a floating icon dock. Each category opens as a separate draggable, resizable window. The default window transparency is 16%.
 
 ![Themes](../preview/themes.svg)
 
@@ -8,9 +8,9 @@ Nocturne aims for a compact, dark, slightly glossy desktop-app feel. Depth comes
 
 | Layer | Token | Treatment |
 | --- | --- | --- |
-| Dock, window, popups | `Backdrop` / `Elevated` | CanvasGroup body, 12–15 px radius, 5–7 stacked shadow layers (≈7% opacity each, 3–4 px spread, 4–8 px drop), 1 px glass edge (`BorderStrong`, brighter at the top), 1 px sheen inside the top edge |
-| Section panel | `Surface` | 8 px radius, 1 px `Border` stroke, 7% top-lit gradient |
-| Fields, idle controls | `Surface2` | 6 px radius (4 px for checks), 1 px stroke |
+| Dock, window, popups | `Backdrop` / `Elevated` | CanvasGroup body, 12–15 px radius, 2 dock / 3 window shadow layers at 3–4% opacity, thin `BorderStrong` edge |
+| Section panel | `Surface` | 10 px radius, 1 px `Border` stroke, 2.5% top-lit gradient |
+| Fields, idle controls | `Surface2` | 6 px radius; filled-square toggles are 18 px with a 5 px radius, without checks or glow |
 | Hover / active pills | `Hover` | Same shape as the control, plus a gloss gradient |
 
 The glass edge is a UIStroke on a frame inset 1 px inside the CanvasGroup, so the CanvasGroup's rounded clipping doesn't cut it off.
@@ -33,8 +33,10 @@ The font is Builder Sans throughout.
 - Window 680 × 520: header 44, tab row 36, footer 28.
 - Page padding 12, column gap 10, section gap 10.
 - Section header 34, body padding 6 / 12 / 10 / 12, row gap 2.
-- Row heights: toggle and keybind 26, slider 40, dropdown or input with label 50, button 28, info 24.
-- Dock buttons 34 with a 4 gap and 6 padding. Icons are 18 px in the dock and 13–14 px everywhere else.
+- Row heights: toggle 24, keybind 26, slider 40, dropdown or input with label 50, button 28, info 24.
+- Dock buttons 34 with a 7 gap and 10 padding. Icons are 20 px in the dock and 13–14 px elsewhere. Each open category gets its own dot.
+- Page widths use explicit side margins and a 10 px column gap. The scroll canvas follows the taller column without expanding the horizontal content area.
+- InputObject positions stay in the same coordinate space as AbsolutePosition. Popup anchors subtract the overlay's AbsolutePosition before placement.
 
 ## Motion
 
@@ -47,12 +49,14 @@ The font is Builder Sans throughout.
 | Slow | 450 ms | Quint Out | dock entrance |
 
 - A new tween on a property replaces the running one (TweenService behaviour), so rapid clicks never stack.
-- Window open/close and popup hide are guarded with version counters, so a late "hide" can't hide something that was reopened.
+- Window open/close and popup hide are guarded against a late hide after reopening. Minimize/restore changes the render area immediately to avoid a cropped CanvasGroup texture.
 - Reduced motion applies values instantly. Animation speed divides every duration.
 
 ## Icons
 
-Icons are drawn on an 18 × 18 grid with a 1.5 stroke (it scales with size): lines with round caps, rings, rounded rects, dots, and clip groups for partial shapes. `tools/export_assets.py` exports each one to `assets/icons/*.svg`, so you can preview or reuse them.
+The main Nocturne and category icons are separate generated transparent PNGs. Twenty smaller controls share one generated atlas. All ten images were uploaded through Studio MCP, and `Icons/Assets.luau` maps all 29 names to real asset IDs. ImageColor3 and ImageTransparency follow the active theme and hover states. Atlas regions adapt to Roblox's decoded texture size.
+
+The original 18 × 18 native glyphs remain as loading and failure fallbacks. They use round-capped lines, arcs, circles and rounded rectangles. `tools/export_assets.py` exports the fallback shapes to SVG.
 
 ## Accent use
 
