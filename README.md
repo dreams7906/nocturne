@@ -7,10 +7,29 @@ A single-file Luau interface library for Roblox with a dark, glossy look: a floa
 Every icon is drawn from plain GuiObjects, the same way the color picker and soft shadows are, so the library needs **no uploaded image assets**.
 
 ```lua
-local Library = require(game.ReplicatedStorage.Nocturne)
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
+
+local Window = Library:CreateWindow({ Title = "Nocturne" })
+local Main = Window:AddTab({ Title = "Main", Icon = "settings" })
+local Section = Main:AddSection({ Title = "General" })
+Section:AddToggle("ExampleToggle", {
+	Title = "Example toggle",
+	Default = false,
+	Callback = function(value)
+		print("Toggle:", value)
+	end,
+})
 ```
 
-`Nocturne.lua` is an ordinary ModuleScript that returns the library table. [`Example.lua`](Example.lua) builds six tabs and uses every element.
+`Nocturne.lua` returns the library table; call `CreateWindow` to show the UI. The remote loader requires an environment that provides client-side `loadstring` and `game:HttpGet`.
+
+To open the full demo with one line:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/RemoteExample.lua"))()
+```
+
+For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)` instead. [`Example.lua`](Example.lua) is the Studio demo; [`RemoteExample.lua`](RemoteExample.lua) is generated from it for remote loading. Both build six tabs and use every element.
 
 ## Features
 

@@ -3,6 +3,7 @@ Headless smoke test: runs Nocturne.lua + Example.lua inside a Roblox mock
 with luau.exe, then fuzzes the UI (tools/smoketest/fuzz.luau).
 
 Usage:  python tools/smoketest/run.py path/to/luau(.exe)
+        python tools/smoketest/run.py path/to/luau(.exe) --remote
 Get luau from https://github.com/luau-lang/luau/releases
 """
 
@@ -68,12 +69,49 @@ for _, err in ipairs(Mock.errors) do
 	end
 end
 """
+    if "--remote" in sys.argv[2:]:
+        remote = read(ROOT / "RemoteExample.lua")
+        # Exercise the real loadstring path without a ReplicatedStorage module.
+        source = f"""
+local Mock = (function()
+{mock}
+end)()
+local nativeLoadstring = loadstring
+local environment = getfenv()
+loadstring = function(source)
+    local chunk, message = nativeLoadstring(source)
+    if chunk then
+        -- Loaded chunks need the mock's typeof/Enum overrides too.
+        setfenv(chunk, environment)
+    end
+    return chunk, message
+end
+game._props.HttpGet = function(_, url)
+    assert(url == "https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua", "Unexpected URL: " .. url)
+    return [====[{bundle}]====]
+end
+local Library = (function()
+{remote}
+return Library
+end)()
+assert(Library and Library.CreateWindow, "Remote loader did not return the library")
+local ok, err = pcall(function(...)
+{fuzz}
+end, Mock, Library)
+if not ok then
+    table.insert(Mock.errors, tostring(err))
+end
+for _, message in ipairs(Mock.errors) do
+    print(message)
+end
+print(("\\n%d error(s)"):format(#Mock.errors))
+"""
     out = HERE / "_combined.luau"
     out.write_text(source, encoding="utf-8", newline="\n")
     result = subprocess.run([luau, str(out)], capture_output=True, text=True)
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
-    return 0 if "\n0 error(s)" in result.stdout else 1
+    return 0 if result.returncode == 0 and "\n0 error(s)" in result.stdout else 1
 
 
 if __name__ == "__main__":

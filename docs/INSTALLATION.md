@@ -1,5 +1,22 @@
 # Installation
 
+## Remote loading
+
+In an environment that provides client-side `loadstring` and `game:HttpGet`:
+
+```lua
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
+local Window = Library:CreateWindow({ Title = "Nocturne" })
+```
+
+Or run the complete demo:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/RemoteExample.lua"))()
+```
+
+The bundle includes every module, so no ModuleScript installation is needed for remote loading. Normal Studio LocalScripts should use the ModuleScript setup below. Remote loading alone does not install the optional server persistence script.
+
 ## Studio (no tools)
 
 1. In **ReplicatedStorage**, insert a **ModuleScript** named `Nocturne` and paste in all of `Nocturne.lua`.
@@ -24,6 +41,8 @@ After editing anything in `src/`, rebuild the bundle:
 ```bash
 python tools/bundle.py
 ```
+
+This also regenerates `RemoteExample.lua` from `Example.lua`. Upload both generated files when updating the repository.
 
 ## Requirements
 
