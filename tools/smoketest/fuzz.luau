@@ -47,6 +47,14 @@ step("Combat has a Bosses sub-tab without a second dock window", function()
 	combat:SelectTab("Bosses")
 	assert(app.Window.Current == bosses.Page and bosses.Page.Canvas.Visible, "Bosses did not open inside Combat")
 	assert(not combat.Page.Canvas.Visible, "General remained visible beneath Bosses")
+	for page, tab in pairs(combat.Page.Window._tabs) do
+		assert(not tab.Icon, "inner tab still stores an icon")
+		for _, child in ipairs(tab.Button:GetDescendants()) do
+			assert(not child:IsA("ImageLabel") and not string.match(child.Name, "^Icon_"), "inner tab contains an icon")
+		end
+		assert(tab.Label.TextSize == 13, "inner tab label size regressed")
+		assert(tab.Label.FontFace[2] == (page == bosses.Page and Enum.FontWeight.Bold or Enum.FontWeight.SemiBold), "inner tab emphasis did not follow selection")
+	end
 	assert(app.Toolbar.OpenPages[combat.Page] and app.Toolbar.Active == combat.Page, "nested tab lost Combat's dock state")
 	assert(#app.Windows == windows and #app.Toolbar.Items == dockItems, "sub-tab created a separate window")
 	assert(Library.Options.BossTarget and Library.Options.BossMarker, "Bosses controls missing")

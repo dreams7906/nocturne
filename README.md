@@ -112,14 +112,14 @@ print(Visuals:IsOpen())
 To add a tab inside a category window, call `AddTab` on that category:
 
 ```lua
-local Bosses = Combat:AddTab({ Title = "Bosses", Icon = "combat" })
+local Bosses = Combat:AddTab({ Title = "Bosses" })
 local Tracking = Bosses:AddSection({ Title = "Boss tracking" })
 Tracking:AddToggle("BossMarker", { Title = "Show boss marker" })
 Combat:SelectTab("Bosses")
 Combat:SelectTab("General") -- return to the category's original controls
 ```
 
-This adds General / Bosses tabs inside the Combat window; it does not add another dock icon or window. The demo includes this hierarchy and Tracking / Alerts tabs inside its Bosses section.
+This adds text-only General / Bosses tabs inside the Combat window; no inner-tab icons are needed. The selected label is bold and highlighted. The demo includes this hierarchy and Tracking / Alerts tabs inside its Bosses section.
 
 The built-in tabs are added after your script finishes its setup, so they always sit at the end of the dock.
 

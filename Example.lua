@@ -38,7 +38,7 @@ local Window = Library:CreateWindow({
 --------------------------------------------------------------------------------
 local Combat = Window:AddTab({ Title = "Combat", Icon = "combat" })
 
-local Bosses = Combat:AddTab({ Title = "Bosses", Icon = "combat" })
+local Bosses = Combat:AddTab({ Title = "Bosses" })
 local BossTracking = Bosses:AddSection({ Title = "Bosses", Tabs = { "Tracking", "Alerts" }, Side = "Left" })
 BossTracking:AddLabel("Demo controls: connect these to your own boss system.", "Muted")
 BossTracking:AddDropdown("BossTarget", {

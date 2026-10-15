@@ -20,7 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Stats = game:GetService("Stats")
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua?v=6161210d5b6b"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua?v=11fd3b742773"))()
 local Options = Library.Options
 
 local Window = Library:CreateWindow({
@@ -38,7 +38,7 @@ local Window = Library:CreateWindow({
 --------------------------------------------------------------------------------
 local Combat = Window:AddTab({ Title = "Combat", Icon = "combat" })
 
-local Bosses = Combat:AddTab({ Title = "Bosses", Icon = "combat" })
+local Bosses = Combat:AddTab({ Title = "Bosses" })
 local BossTracking = Bosses:AddSection({ Title = "Bosses", Tabs = { "Tracking", "Alerts" }, Side = "Left" })
 BossTracking:AddLabel("Demo controls: connect these to your own boss system.", "Muted")
 BossTracking:AddDropdown("BossTarget", {

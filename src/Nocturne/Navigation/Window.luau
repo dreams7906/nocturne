@@ -36,7 +36,7 @@ local function iconButton(ctx, parent, iconName, order)
 	theme:Bind(button, { BackgroundColor3 = "Hover" })
 	-- `ref.Icon` can be swapped later (minimise <-> restore glyph).
 	local ref = {}
-	ref.Icon = Icons.create(iconName, 14, theme.Tokens.TextMuted, {
+	ref.Icon = Icons.create(iconName, 16, theme.Tokens.TextDim, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Parent = button,
@@ -45,7 +45,7 @@ local function iconButton(ctx, parent, iconName, order)
 	local function render(instant)
 		local t = theme.Tokens
 		Motion.tween(button, instant and "Instant" or "Fast", { BackgroundTransparency = hovered and 0 or 1 })
-		Icons.tween(ref.Icon, instant and "Instant" or "Fast", hovered and t.Text or t.TextMuted)
+		Icons.tween(ref.Icon, instant and "Instant" or "Fast", hovered and t.Text or t.TextDim)
 	end
 	ref.Render = render
 	button.MouseEnter:Connect(function()
@@ -514,10 +514,10 @@ function Window:_renderTabs(instant)
 	for page, tab in pairs(self._tabs) do
 		local active = page == self.Current
 		local preset = instant and "Instant" or "Fast"
+		tab.Label.FontFace = active and Util.Fonts.Bold or Util.Fonts.SemiBold
 		Motion.tween(tab.Label, preset, {
-			TextColor3 = active and t.Text or (tab.Hovered and t.TextDim or t.TextMuted),
+			TextColor3 = (active or tab.Hovered) and t.Text or t.TextDim,
 		})
-		Icons.tween(tab.Icon, preset, active and t.Text or (tab.Hovered and t.TextDim or t.TextMuted))
 	end
 
 	local tab = self.Current and self._tabs[self.Current]
@@ -541,7 +541,6 @@ end
 
 function Window:AddPage(page)
 	table.insert(self.Pages, page)
-	local ctx = self.ctx
 	local button = Util.button({
 		Name = page.Name,
 		AutomaticSize = Enum.AutomaticSize.X,
@@ -550,23 +549,23 @@ function Window:AddPage(page)
 		ZIndex = 3,
 		Parent = self.TabList,
 	})
-	Util.padding(button, 0, 10)
+	Util.padding(button, 0, 12)
 	Util.list(button, {
 		FillDirection = Enum.FillDirection.Horizontal,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		Padding = 6,
 	})
-	local icon = Icons.create(page.Icon, 18, ctx.Theme.Tokens.TextDim, { ZIndex = 3, Parent = button })
 	local label = Util.text({
 		Text = page.DisplayName or page.Name,
 		FontFace = Util.Fonts.SemiBold,
+		TextSize = 13,
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromScale(0, 1),
 		LayoutOrder = 1,
 		ZIndex = 3,
 		Parent = button,
 	})
-	local tab = { Button = button, Icon = icon, Label = label, Hovered = false }
+	local tab = { Button = button, Label = label, Hovered = false }
 	self._tabs[page] = tab
 
 	button.Activated:Connect(function()
@@ -669,7 +668,7 @@ function Window:SetMinimized(minimized)
 	local ref = self._minimizeRef
 	local parent = ref.Icon.Parent
 	ref.Icon:Destroy()
-	ref.Icon = Icons.create(minimized and "maximize" or "minimize", 14, self.ctx.Theme.Tokens.TextMuted, {
+	ref.Icon = Icons.create(minimized and "maximize" or "minimize", 16, self.ctx.Theme.Tokens.TextDim, {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Parent = parent,
