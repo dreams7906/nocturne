@@ -318,16 +318,44 @@ end
 
 -- Tab ------------------------------------------------------------------------
 
+function Tab:AddTab(opts)
+	opts = type(opts) == "string" and { Title = opts } or (opts or {})
+	self.SubTabs = self.SubTabs or {}
+	local title = opts.Title or opts.Name or ("Tab " .. (#self.SubTabs + 1))
+	for _, existing in ipairs(self.SubTabs) do
+		if existing.Title == title then return existing end
+	end
+	local page = self.Window.App:SubPage(self.Page, { Title = title, Icon = opts.Icon, Columns = opts.Columns })
+	local tab = setmetatable({ Window = self.Window, Page = page, Title = title }, Tab)
+	table.insert(self.SubTabs, tab)
+	return tab
+end
+
+function Tab:SelectTab(which)
+	local page = which == "General" and self.Page or nil
+	if which ~= "General" then
+		for index, tab in ipairs(self.SubTabs or {}) do
+			if which == tab or which == index or which == tab.Title then
+				page = tab.Page
+				break
+			end
+		end
+	end
+	if page then self.Window.App:SelectPage(page) end
+end
+
 function Tab:Open()
 	self.Window.App:Open(self.Page.Name)
 end
 
 function Tab:Close()
-	self.Page.Window:Close()
+	if self.Page == self.Page.RootPage or self.Page.Window.Current == self.Page then
+		self.Page.Window:Close()
+	end
 end
 
 function Tab:Toggle()
-	if self.Page.Window.IsOpen then
+	if self:IsOpen() then
 		self:Close()
 	else
 		self:Open()
@@ -336,6 +364,7 @@ end
 
 function Tab:IsOpen()
 	return self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
+		and (self.Page == self.Page.RootPage or self.Page.Window.Current == self.Page)
 end
 
 function Tab:SetSize(width, height)

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import hashlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src" / "Nocturne"
@@ -138,7 +139,8 @@ def main() -> None:
     studio_loader = 'local Library = require(ReplicatedStorage:WaitForChild("Nocturne"))'
     if example.count(studio_loader) != 1:
         raise ValueError("Expected exactly one Studio library loader in Example.lua")
-    remote_loader = 'local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()'
+    digest = hashlib.sha256(OUT.read_bytes()).hexdigest()[:12]
+    remote_loader = f'local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua?v={digest}"))()'
     example = example.replace(studio_loader, remote_loader)
     example = example.replace(
         "\tSetup (Roblox Studio)\n\t1. Put Nocturne.lua in ReplicatedStorage as a ModuleScript named \"Nocturne\".\n\t2. Put this file in StarterPlayer > StarterPlayerScripts as a LocalScript.\n\t3. Press Play. Right Ctrl toggles the window.",

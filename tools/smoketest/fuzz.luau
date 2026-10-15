@@ -39,6 +39,26 @@ assert(app, "Library.App missing")
 print(("tabs: %d (dock items: %d)"):format(#app.Pages, #app.Toolbar.Items))
 print("window open after start: " .. tostring(app:IsOpen()))
 
+step("Combat has a Bosses sub-tab without a second dock window", function()
+	local combat = Library.Window.Tabs[1]
+	local bosses = combat.SubTabs and combat.SubTabs[1]
+	assert(bosses and bosses.Title == "Bosses", "Bosses example sub-tab missing")
+	local windows, dockItems = #app.Windows, #app.Toolbar.Items
+	combat:SelectTab("Bosses")
+	assert(app.Window.Current == bosses.Page and bosses.Page.Canvas.Visible, "Bosses did not open inside Combat")
+	assert(not combat.Page.Canvas.Visible, "General remained visible beneath Bosses")
+	assert(app.Toolbar.OpenPages[combat.Page] and app.Toolbar.Active == combat.Page, "nested tab lost Combat's dock state")
+	assert(#app.Windows == windows and #app.Toolbar.Items == dockItems, "sub-tab created a separate window")
+	assert(Library.Options.BossTarget and Library.Options.BossMarker, "Bosses controls missing")
+	local bossSection = bosses.Page.Left.Section_Bosses
+	click(bossSection.Header.Alerts)
+	assert(bossSection.Body_Alerts.Visible and not bossSection.Body_Tracking.Visible, "Bosses section sub-tab did not switch")
+	click(bossSection.Header.Tracking)
+	click(bosses.Page.Canvas:FindFirstChild("Test boss notification", true))
+	combat:SelectTab("General")
+	assert(app.Window.Current == combat.Page and not bosses.Page.Canvas.Visible, "General did not restore")
+end)
+
 -- Dock: every icon, then the active icon again (collapse), then reopen.
 for _, item in ipairs(app.Toolbar.Items) do
 	step("dock " .. item.Page.Name, function()

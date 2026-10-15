@@ -125,10 +125,9 @@ Icons.Glyphs = {
 		{"line", 9, 16.5, 16, 13},
 	},
 	resize = {
-		{"line", 5, 15, 15, 15},
-		{"line", 15, 15, 15, 5},
-		{"line", 8, 11, 11, 8},
-		{"line", 4, 11, 11, 4},
+		{"line", 3, 15, 10, 15},
+		{"arc", 10, 10, 5, 0, 90},
+		{"line", 15, 10, 15, 3},
 	},
 	chevron = {
 		{"line", 5, 7, 9, 11},
@@ -337,7 +336,7 @@ function Icons.create(name, size, color, props)
 	local shapes = Icons.Glyphs[name] or Icons.Glyphs.misc
 	local asset = Assets[name]
 	local unit = size / GRID
-	local thickness = props.Thickness or math.max(1, 1.5 * unit)
+	local thickness = props.Thickness or math.max(1.25, 2 * unit)
 	local z = props.ZIndex or 1
 
 	local icon = Instance.new(asset and "ImageLabel" or "Frame")

@@ -87,7 +87,7 @@ loadstring = function(source)
     return chunk, message
 end
 game._props.HttpGet = function(_, url)
-    assert(url == "https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua", "Unexpected URL: " .. url)
+    assert(string.match(url, "^https://raw%.githubusercontent%.com/dreams7906/nocturne/main/Nocturne%.lua%?v=%x+$"), "Unexpected URL: " .. url)
     return [====[{bundle}]====]
 end
 local Library = (function()

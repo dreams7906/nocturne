@@ -34,7 +34,7 @@ The font is Builder Sans throughout.
 - Page padding 12, column gap 10, section gap 10.
 - Section header 34, body padding 6 / 12 / 10 / 12, row gap 2.
 - Row heights: toggle 24, keybind 26, slider 40, dropdown or input with label 50, button 28, info 24.
-- Dock buttons 34 with a 7 gap and 10 padding. Icons are 20 px in the dock and 13–14 px elsewhere. Each open category gets its own dot.
+- Dock buttons 34 with a 7 gap and 10 padding. Navigation icons are 24 px in the dock and 18 px in category sub-tabs, with heavier source strokes and brighter inactive tint. Each open category gets its own dot.
 - Page widths use explicit side margins and a 10 px column gap. The scroll canvas follows the taller column without expanding the horizontal content area.
 - InputObject positions stay in the same coordinate space as AbsolutePosition. Popup anchors subtract the overlay's AbsolutePosition before placement.
 
@@ -54,7 +54,7 @@ The font is Builder Sans throughout.
 
 ## Icons
 
-The main Nocturne and category icons are separate generated transparent PNGs. Twenty smaller controls share one generated atlas. All ten images were uploaded through Studio MCP, and `Icons/Assets.luau` maps all 29 names to real asset IDs. ImageColor3 and ImageTransparency follow the active theme and hover states. Atlas regions adapt to Roblox's decoded texture size.
+The Nocturne and category icons share a bold three-by-three navigation atlas. Smaller controls share another atlas, and the resize handle uses a separate rounded-corner image with no interior grip marks. All three active images were uploaded through Studio MCP, and `Icons/Assets.luau` maps all 29 names to real asset IDs. ImageColor3 and ImageTransparency follow the active theme and hover states. Atlas regions adapt to Roblox's decoded texture size.
 
 The original 18 × 18 native glyphs remain as loading and failure fallbacks. They use round-capped lines, arcs, circles and rounded rectangles. `tools/export_assets.py` exports the fallback shapes to SVG.
 

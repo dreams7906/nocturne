@@ -179,10 +179,29 @@ function App:Page(opts)
 	end
 	local page = Page.new(self.ctx, window.PageHolder, opts)
 	page.Window = window
+	page.RootPage = page
 	table.insert(self.Pages, page)
 	window:AddPage(page)
 	self.Toolbar:AddItem(page)
 	window:Select(page, true)
+	return page
+end
+
+function App:SubPage(parent, opts)
+	local root = parent.RootPage or parent
+	local window = root.Window
+	local page = Page.new(self.ctx, window.PageHolder, {
+		Name = parent.Name .. "." .. opts.Title,
+		DisplayName = opts.Title,
+		Icon = opts.Icon or root.Icon,
+		Columns = opts.Columns,
+	})
+	page.Window, page.RootPage = window, root
+	if not root.DisplayName then
+		root.DisplayName = "General"
+		window._tabs[root].Label.Text = root.DisplayName
+	end
+	window:AddPage(page)
 	return page
 end
 
@@ -197,6 +216,7 @@ function App:_attachWindow(window)
 		self:_applyBlur(self:IsOpen())
 		self.Closed:Fire()
 	end)
+	window.PageChanged:Connect(function() self:_refreshDock() end)
 end
 
 function App:_focusWindow(window)
@@ -212,17 +232,18 @@ function App:_refreshDock()
 	local opened = {}
 	for _, window in ipairs(self.Windows) do
 		if window.IsOpen and window.Current then
-			opened[window.Current] = true
+			opened[window.Current.RootPage or window.Current] = true
 		end
 	end
 	self.Toolbar:SetOpenPages(opened)
-	self.Toolbar:SetActive(self.Window.IsOpen and self.Window.Current or nil)
+	local current = self.Window.Current
+	self.Toolbar:SetActive(self.Window.IsOpen and current and (current.RootPage or current) or nil)
 end
 
 function App:GetPage(name)
-	for _, page in ipairs(self.Pages) do
-		if page.Name == name then
-			return page
+	for _, window in ipairs(self.Windows) do
+		for _, page in ipairs(window.Pages) do
+			if page.Name == name then return page end
 		end
 	end
 	return nil

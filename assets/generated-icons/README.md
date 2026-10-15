@@ -2,7 +2,7 @@
 
 Created with the built-in image-generation tool and uploaded through Roblox Studio MCP `upload_image`. Original transparent PNGs are kept here. `manifest.json` records the returned Roblox asset IDs and the row-major control-sheet mapping.
 
-Nine images cover the Nocturne mark and eight categories. `controls.png` covers twenty smaller UI controls in a five-column, four-row atlas. The loader derives the sprite regions from the source dimensions and adjusts them to Roblox's decoded image size. Drawn fallbacks remain visible until images load.
+`navigation-bold.png` covers the Nocturne mark and eight categories in a three-by-three atlas. `controls.png` provides the small UI controls. `resize-rounded.png` overrides its old grip with one rounded corner and no interior marks. The loader derives sprite regions from source dimensions and adjusts them to Roblox's decoded image size. Drawn fallbacks remain visible until images load. The original individual navigation images and their IDs are retained as previous assets.
 
 To update the Lua mappings after replacing an image and its uploaded ID:
 
@@ -30,3 +30,9 @@ Individual subjects:
 Control-sheet prompt: one transparent GUI sprite atlas in a precise five-column, four-row grid, each glyph centered in its own cell, white uniform rounded strokes, no labels, grid lines, background, texture or shadows. Row 1: bottom-right resize grip, down chevron, check, close X, minimize minus. Row 2: maximize square, search, keyboard, save arrow into tray, load arrow from tray. Row 3: trash, pencil, plus, copy, bell. Row 4: circled info, triangular warning, circled success, palette, four-point sparkle.
 
 Roblox may initially mark new uploads as pending. Upload success and asset-ID assignment do not mean moderation or image processing has completed.
+
+## Bold navigation and rounded-corner revision
+
+Navigation prompt: one transparent three-by-three icon atlas, pure-white opaque geometric symbols, consistent optically bold rounded strokes about 12% of each cell width and an 82% symbol footprint, designed for 18–24 px display. Row 1: crescent/N/star Nocturne mark, shield/sword Combat, eye Visuals. Row 2: globe World, head/shoulders Player, sliders Settings. Row 3: folder/document Configs, wrench Utilities, stacked layers Misc. No labels, enclosing frames, grid lines, glow or texture.
+
+Resize prompt: only one white bottom-right corner bracket on transparency. A horizontal lower stroke bends through a generous quarter-circle into the right vertical stroke, with round end caps. No sharp point, triangle, arrow, diagonal grip strokes, interior marks, parallel lines, dots, background, glow or texture.

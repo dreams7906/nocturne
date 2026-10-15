@@ -4,7 +4,7 @@ A single-file Luau interface library for Roblox with a charcoal interface: a flo
 
 ![Dock](preview/dock.svg)
 
-The 29 icons use generated transparent artwork uploaded through Roblox Studio MCP: nine main images and a shared sheet for 20 controls. Their Roblox asset IDs are bundled into the library. Drawn fallbacks stay visible while an image is loading or awaiting Roblox processing.
+The 29 icons use generated transparent artwork uploaded through Roblox Studio MCP: a bold navigation sheet, a control sheet, and a separate rounded resize corner. Their Roblox asset IDs are bundled into the library. Drawn fallbacks stay visible while an image is loading or awaiting Roblox processing.
 
 ```lua
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
@@ -108,6 +108,18 @@ Visuals:Toggle()
 Visuals:SetSize(820, 620)
 print(Visuals:IsOpen())
 ```
+
+To add a tab inside a category window, call `AddTab` on that category:
+
+```lua
+local Bosses = Combat:AddTab({ Title = "Bosses", Icon = "combat" })
+local Tracking = Bosses:AddSection({ Title = "Boss tracking" })
+Tracking:AddToggle("BossMarker", { Title = "Show boss marker" })
+Combat:SelectTab("Bosses")
+Combat:SelectTab("General") -- return to the category's original controls
+```
+
+This adds General / Bosses tabs inside the Combat window; it does not add another dock icon or window. The demo includes this hierarchy and Tracking / Alerts tabs inside its Bosses section.
 
 The built-in tabs are added after your script finishes its setup, so they always sit at the end of the dock.
 

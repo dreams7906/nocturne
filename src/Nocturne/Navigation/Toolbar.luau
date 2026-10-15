@@ -20,7 +20,7 @@ local BUTTON = 34
 local GAP = 7
 local PAD = 10
 local TOP = 12
-local ICON = 20
+local ICON = 24
 
 function Toolbar.new(ctx)
 	local theme = ctx.Theme
@@ -150,7 +150,7 @@ function Toolbar:_render(instant)
 	local t = self.ctx.Theme.Tokens
 	for _, item in ipairs(self.Items) do
 		local active = self.OpenPages[item.Page] == true
-		local color = active and t.Text or (item.Hovered and t.TextDim or t.TextMuted)
+		local color = (active or item.Hovered) and t.Text or t.TextDim
 		Icons.tween(item.Icon, instant and "Instant" or "Fast", color)
 		Motion.tween(item.Dot, instant and "Instant" or "Fast", { BackgroundTransparency = active and 0 or 1, BackgroundColor3 = t.Text })
 		Motion.tween(item.Button, instant and "Instant" or "Fast", { BackgroundColor3 = t.Hover, BackgroundTransparency = item.Hovered and 0.45 or 1 })

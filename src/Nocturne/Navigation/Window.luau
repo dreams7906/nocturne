@@ -556,9 +556,9 @@ function Window:AddPage(page)
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		Padding = 6,
 	})
-	local icon = Icons.create(page.Icon, 13, ctx.Theme.Tokens.TextMuted, { ZIndex = 3, Parent = button })
+	local icon = Icons.create(page.Icon, 18, ctx.Theme.Tokens.TextDim, { ZIndex = 3, Parent = button })
 	local label = Util.text({
-		Text = page.Name,
+		Text = page.DisplayName or page.Name,
 		FontFace = Util.Fonts.SemiBold,
 		AutomaticSize = Enum.AutomaticSize.X,
 		Size = UDim2.fromScale(0, 1),

@@ -38,6 +38,21 @@ local Window = Library:CreateWindow({
 --------------------------------------------------------------------------------
 local Combat = Window:AddTab({ Title = "Combat", Icon = "combat" })
 
+local Bosses = Combat:AddTab({ Title = "Bosses", Icon = "combat" })
+local BossTracking = Bosses:AddSection({ Title = "Bosses", Tabs = { "Tracking", "Alerts" }, Side = "Left" })
+BossTracking:AddLabel("Demo controls: connect these to your own boss system.", "Muted")
+BossTracking:AddDropdown("BossTarget", {
+	Title = "Example target", Values = { "Training Golem", "Frost Guardian", "All bosses" }, Default = "Training Golem",
+})
+BossTracking:AddToggle("BossMarker", { Title = "Show boss marker", Default = true })
+BossTracking:AddSlider("BossDistance", { Title = "Marker distance", Min = 50, Max = 1000, Default = 350, Suffix = " studs" })
+BossTracking:Tab("Alerts"):AddToggle("BossAlerts", { Title = "Boss spawn alerts", Default = true })
+local BossPreview = Bosses:AddSection({ Title = "Preview", Side = "Right" })
+BossPreview:AddParagraph({ Title = "Combat / Bosses", Content = "This is a sub-tab inside the Combat window. Tracking and Alerts are sub-tabs inside the Bosses section." })
+BossPreview:AddButton({ Title = "Test boss notification", Callback = function()
+	Library:Notify({ Title = "Bosses", Content = "Example boss notification", Type = "Info" })
+end })
+
 local LockOn = Combat:AddSection({ Tabs = { "Lock-On", "Priority" }, Side = "Left" })
 LockOn:AddToggle("LockOn", {
 	Title = "Enable lock-on",

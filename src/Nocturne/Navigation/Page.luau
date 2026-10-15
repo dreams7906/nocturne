@@ -19,6 +19,7 @@ function Page.new(ctx, parent, opts)
 	local self = setmetatable({
 		ctx = ctx,
 		Name = opts.Name or "Page",
+		DisplayName = opts.DisplayName,
 		Icon = opts.Icon or "misc",
 		Description = opts.Description,
 		_orders = { Left = 0, Right = 0 },
