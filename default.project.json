@@ -1,0 +1,16 @@
+{
+  "name": "Nocturne",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Nocturne": {
+        "$path": "src/Nocturne"
+      }
+    },
+    "ServerScriptService": {
+      "NocturneConfigPersistence": {
+        "$path": "server/ConfigPersistence.server.lua"
+      }
+    }
+  }
+}
