@@ -34,7 +34,7 @@ For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)
 ## Features
 
 - **Floating dock.** Each category has an icon and its own window. Open several together, drag them separately, and click an open icon again to close only that window. Dots show every open category; hovering shows its name.
-- **Hide everything.** Right Ctrl (or your menu key) hides the dock, windows, popups and overlays together. Press it again to restore your windows in their previous positions.
+- **Hide everything.** Right Ctrl (or your menu key) pops the dock and open windows out and back in. Open categories, minimized states and window positions are preserved. If every category is closed, showing the UI restores only the dock.
 - **Windows.** Each has a brand header, category label, profile, minimise/restore and close buttons, a scrolling two-column page area and a status footer. Minimizing hides the content and footer; restoring returns the full panel.
 - **Glass finish.** Translucent gradient surfaces, soft white rim lighting and brighter outlined sections.
 - **Resize.** Hold the white grip in a window's bottom-right corner to change its width and height. Each window keeps its own size.
@@ -45,6 +45,7 @@ For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)
 - **Built-in Configs tab:** save, load, rename and delete named configs, and export/import as JSON. Configs persist per player when `server/ConfigPersistence.server.lua` is installed; otherwise they last for the session.
 - **Built-in Settings tab:** 7 theme presets, a custom accent color, window transparency, glossy effects on/off, background blur, UI scale, menu key, tooltips, reduced motion, animation speed, notification options, a watermark (single or two row) and a keybind list.
 - **Polish:** layered soft shadows, top-lit gradients, 1px glass edges, hover/press states on everything, quint easing, and no stacked animations when you click fast.
+- **Notifications:** compact glass cards with a status icon and close button. Hover freezes the countdown and progress bar exactly where they are; leaving resumes the remaining time. Timers also pause while the interface is hidden.
 - **Responsive.** The window scales down to fit small screens, and mouse and touch both drive sliders, pickers and dragging.
 
 ## Repository layout

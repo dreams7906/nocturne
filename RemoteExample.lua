@@ -20,7 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Stats = game:GetService("Stats")
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua?v=11fd3b742773"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua?v=d7f4ff440756"))()
 local Options = Library.Options
 
 local Window = Library:CreateWindow({

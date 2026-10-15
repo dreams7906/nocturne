@@ -25,6 +25,7 @@ Motion.Presets = {
 	Fast = { 0.14, Enum.EasingStyle.Quad, Out },
 	Normal = { 0.22, Enum.EasingStyle.Quint, Out },
 	Smooth = { 0.32, Enum.EasingStyle.Quint, Out },
+	Pop = { 0.3, Enum.EasingStyle.Back, Out },
 	Slow = { 0.45, Enum.EasingStyle.Quint, Out },
 	Glide = { 0.38, Enum.EasingStyle.Cubic, InOut },
 	Linear = { 1, Enum.EasingStyle.Linear, Out },

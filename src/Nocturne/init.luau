@@ -363,7 +363,7 @@ function Tab:Toggle()
 end
 
 function Tab:IsOpen()
-	return self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
+	return self.Window.App._interfaceVisible and self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
 		and (self.Page == self.Page.RootPage or self.Page.Window.Current == self.Page)
 end
 

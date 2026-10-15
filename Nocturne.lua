@@ -101,6 +101,7 @@ __modules["Nocturne.Animations.Motion"] = function(script, require)
 		Fast = { 0.14, Enum.EasingStyle.Quad, Out },
 		Normal = { 0.22, Enum.EasingStyle.Quint, Out },
 		Smooth = { 0.32, Enum.EasingStyle.Quint, Out },
+		Pop = { 0.3, Enum.EasingStyle.Back, Out },
 		Slow = { 0.45, Enum.EasingStyle.Quint, Out },
 		Glide = { 0.38, Enum.EasingStyle.Cubic, InOut },
 		Linear = { 1, Enum.EasingStyle.Linear, Out },
@@ -285,7 +286,10 @@ __modules["Nocturne.App"] = function(script, require)
 			Opened = Signal.new(),
 			Closed = Signal.new(),
 			_connections = {},
+			_interfaceVisible = true,
+			_visibilityVersion = 0,
 		}, App)
+		ctx.IsInterfaceVisible = function() return self._interfaceVisible end
 
 		self.Toolbar = Toolbar.new(ctx)
 		ctx.ToolbarBottom = function()
@@ -432,7 +436,7 @@ __modules["Nocturne.App"] = function(script, require)
 	end
 
 	function App:Open(pageName)
-		self.Gui.Enabled = true
+		self:_setInterfaceVisible(true)
 		if pageName then
 			self:SelectPage(pageName)
 		end
@@ -443,27 +447,39 @@ __modules["Nocturne.App"] = function(script, require)
 	end
 
 	function App:Close()
-		self.Gui.Enabled = false
-		self.ctx.Popups:CloseAll()
-		self.ctx.Tooltip:Hide()
-		self:_applyBlur(false)
+		self:_setInterfaceVisible(false)
 	end
 
-	function App:Toggle()
-		if self.Gui.Enabled then
-			self:Close()
-		else
-			self.Gui.Enabled = true
-			if not self:IsOpen() then
-				self:Open()
-			else
-				self:_applyBlur(true)
+	function App:_setInterfaceVisible(shown)
+		if self._interfaceVisible == shown then return end
+		self._interfaceVisible = shown
+		self._visibilityVersion += 1
+		local version = self._visibilityVersion
+		self.ctx.Popups:CloseAll()
+		self.ctx.Tooltip:Hide()
+		if shown then self.Gui.Enabled = true end
+		self.Toolbar:SetPresented(shown)
+		for _, window in ipairs(self.Windows) do
+			window:SetPresented(shown)
+		end
+		self:_applyBlur(shown and self:IsOpen())
+		if not shown then
+			local function finish()
+				if not self._destroyed and version == self._visibilityVersion then
+					self.Gui.Enabled = false
+				end
 			end
+			local duration = Motion.info("Normal").Time
+			if duration <= 0 then finish() else task.delay(duration, finish) end
 		end
 	end
 
+	function App:Toggle()
+		self:_setInterfaceVisible(not self._interfaceVisible)
+	end
+
 	function App:IsOpen()
-		if not self.Gui.Enabled then return false end
+		if not self._interfaceVisible or not self.Gui.Enabled then return false end
 		for _, window in ipairs(self.Windows) do
 			if window.IsOpen then return true end
 		end
@@ -2813,24 +2829,15 @@ end
 
 __node("Nocturne.Components.Notifications")
 __modules["Nocturne.Components.Notifications"] = function(script, require)
-	--[[
-		Notifications
-		Toast stack in the bottom-right corner. Toasts slide in, show a thin
-		progress bar for their lifetime and collapse smoothly when dismissed.
-
-		ctx.Notify({ Title, Text, Type = "info"|"success"|"warning"|"error", Duration })
-	]]
-
+	local RunService = game:GetService("RunService")
 	local Util = require(script.Parent.Parent.Core.Util)
 	local Motion = require(script.Parent.Parent.Animations.Motion)
 	local Icons = require(script.Parent.Parent.Icons.Icons)
+	local Maid = require(script.Parent.Parent.Core.Maid)
 
 	local Notifications = {}
 	Notifications.__index = Notifications
-
-	local WIDTH = 270
-	local MAX_VISIBLE = 5
-
+	local WIDTH, MAX_VISIBLE = 280, 5
 	local TYPES = {
 		info = { icon = "info", token = "Accent" },
 		success = { icon = "success", token = "Success" },
@@ -2841,21 +2848,16 @@ __modules["Nocturne.Components.Notifications"] = function(script, require)
 	function Notifications.new(ctx)
 		local self = setmetatable({ ctx = ctx, _toasts = {}, Enabled = true, Position = "Bottom Right" }, Notifications)
 		local stack = Util.frame({
-			Name = "Notifications",
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -18, 1, -18),
-			Size = UDim2.new(0, WIDTH, 1, -120),
-			ZIndex = 150,
-			Parent = ctx.Overlay,
+			Name = "Notifications", AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -18, 1, -18), Size = UDim2.new(0, WIDTH, 1, -120),
+			ZIndex = 150, Parent = ctx.Overlay,
 		})
 		self._layout = Util.list(stack, {
-			Padding = 8,
-			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			Padding = 8, VerticalAlignment = Enum.VerticalAlignment.Bottom,
 			HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		})
 		self._scale = Util.new("UIScale", { Parent = stack })
-		self.Stack = stack
-		self._order = 0
+		self.Stack, self._order = stack, 0
 		return self
 	end
 
@@ -2865,165 +2867,156 @@ __modules["Nocturne.Components.Notifications"] = function(script, require)
 
 	function Notifications:SetPosition(where)
 		self.Position = where
-		local stack = self.Stack
 		if where == "Top Right" then
-			stack.AnchorPoint = Vector2.new(1, 0)
-			stack.Position = UDim2.new(1, -18, 0, 72)
+			self.Stack.AnchorPoint = Vector2.new(1, 0)
+			self.Stack.Position = UDim2.new(1, -18, 0, 72)
 			self._layout.VerticalAlignment = Enum.VerticalAlignment.Top
 		else
-			stack.AnchorPoint = Vector2.new(1, 1)
-			stack.Position = UDim2.new(1, -18, 1, -18)
+			self.Stack.AnchorPoint = Vector2.new(1, 1)
+			self.Stack.Position = UDim2.new(1, -18, 1, -18)
 			self._layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 		end
 	end
 
 	function Notifications:Push(opts)
-		if not self.Enabled then
-			return
-		end
-		local ctx = self.ctx
-		local theme = ctx.Theme
-		local kind = TYPES[opts.Type or "info"] or TYPES.info
-		local duration = opts.Duration or ctx.NotifyDuration or 4
-
-		-- Oldest toasts leave first when the stack is full.
-		if #self._toasts >= MAX_VISIBLE then
-			self._toasts[1].Dismiss()
-		end
-
+		if not self.Enabled then return end
+		local ctx, theme = self.ctx, self.ctx.Theme
+		local toast
+		local kind = TYPES[string.lower(opts.Type or "info")] or TYPES.info
+		local duration = math.max(0.1, tonumber(opts.Duration or ctx.NotifyDuration) or 4)
+		if #self._toasts >= MAX_VISIBLE then self._toasts[1].Dismiss() end
 		self._order += 1
 		local bottomUp = self._layout.VerticalAlignment == Enum.VerticalAlignment.Bottom
 		local slot = Util.frame({
-			Name = "Toast",
-			AutomaticSize = Enum.AutomaticSize.Y,
-			Size = UDim2.new(1, 0, 0, 0),
+			Name = "Toast", Size = UDim2.new(1, 0, 0, 64),
 			LayoutOrder = bottomUp and self._order or -self._order,
-			ClipsDescendants = false,
-			Parent = self.Stack,
+			ClipsDescendants = false, Parent = self.Stack,
 		})
-
-		local card = Util.new("TextButton", {
-			Name = "Card",
-			AutoButtonColor = false,
-			Text = "",
-			AutomaticSize = Enum.AutomaticSize.Y,
-			Size = UDim2.new(1, 0, 0, 0),
-			Position = UDim2.fromOffset(36, 0),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Parent = slot,
+		local maid = Maid.new():LinkTo(slot)
+		local card = Util.new("CanvasGroup", {
+			Name = "Card", Active = true,
+			Size = UDim2.fromScale(1, 1), Position = UDim2.fromOffset(20, 0),
+			BackgroundTransparency = 0.04, GroupTransparency = 1, BorderSizePixel = 0, Parent = slot,
 		})
-		Util.corner(card, 9)
-		Util.padding(card, 11, 12, 13, 14)
-		local stroke = Util.stroke(card, { Transparency = 1 })
+		Util.corner(card, 10)
+		Util.padding(card, 10, 12, 20, 12)
 		theme:Bind(card, { BackgroundColor3 = "Elevated" })
-		theme:Bind(stroke, { Color = "BorderStrong" })
-		Util.gloss(card, 0.1)
-
-		local accent = Util.frame({
-			Name = "Accent",
-			BackgroundTransparency = 1,
-			Position = UDim2.new(0, -8, 0, 1),
-			Size = UDim2.new(0, 2, 1, -2),
-			Parent = card,
+		local scale = Util.new("UIScale", { Scale = 0.96, Parent = card })
+		local gloss = Util.gloss(card, 0.08)
+		ctx:RegisterGloss(gloss)
+		local edge = Util.frame({
+			Name = "Edge", Position = UDim2.fromOffset(-11, -9),
+			Size = UDim2.new(1, 22, 1, 28), ZIndex = 5, Parent = card,
 		})
-		Util.corner(accent, 1)
-		theme:Bind(accent, { BackgroundColor3 = kind.token })
-
-		local icon = Icons.create(kind.icon, 15, theme:Get(kind.token), {
-			Position = UDim2.fromOffset(0, 1),
-			Transparency = 1,
-			Parent = card,
+		Util.corner(edge, 9)
+		local stroke = Util.glassStroke(ctx, edge, "BorderStrong", 0.45)
+		local badge = Util.frame({
+			Name = "Badge", Size = UDim2.fromOffset(28, 28),
+			BackgroundTransparency = 0.91, ZIndex = 2, Parent = card,
 		})
-
+		Util.corner(badge, 8)
+		theme:Bind(badge, { BackgroundColor3 = kind.token })
+		local badgeStroke = Util.stroke(badge, { Transparency = 0.86 })
+		theme:Bind(badgeStroke, { Color = kind.token })
+		local icon = Icons.create(kind.icon, 16, theme:Get(kind.token), {
+			AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), ZIndex = 2, Parent = badge,
+		})
+		maid:Give(theme.Changed:Connect(function() Icons.tint(icon, theme:Get(kind.token)) end))
 		local title = Util.text({
-			Text = opts.Title or "Notification",
-			FontFace = Util.Fonts.Bold,
-			TextSize = 12,
-			Position = UDim2.fromOffset(23, 0),
-			Size = UDim2.new(1, -23, 0, 16),
-			TextTransparency = 1,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Parent = card,
+			Name = "Title", Text = opts.Title or "Notification", FontFace = Util.Fonts.Bold,
+			TextSize = 13, Position = UDim2.fromOffset(40, 0), Size = UDim2.new(1, -62, 0, 16),
+			TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 2, Parent = card,
 		})
 		theme:Bind(title, { TextColor3 = "Text" })
-
 		local body = Util.text({
-			Text = opts.Text or "",
-			TextSize = 12,
-			TextWrapped = true,
-			AutomaticSize = Enum.AutomaticSize.Y,
-			Position = UDim2.fromOffset(23, 19),
-			Size = UDim2.new(1, -23, 0, 0),
-			TextYAlignment = Enum.TextYAlignment.Top,
-			TextTransparency = 1,
-			Visible = (opts.Text or "") ~= "",
-			Parent = card,
+			Name = "Message", Text = opts.Text or "", TextSize = 12, TextWrapped = true,
+			AutomaticSize = Enum.AutomaticSize.Y, Position = UDim2.fromOffset(40, 21),
+			Size = UDim2.new(1, -40, 0, 0), TextYAlignment = Enum.TextYAlignment.Top,
+			Visible = (opts.Text or "") ~= "", ZIndex = 2, Parent = card,
 		})
 		theme:Bind(body, { TextColor3 = "TextDim" })
-
+		local function fitContent()
+			if toast and toast.Dismissed then return end
+			local height = body.AbsoluteSize.Y / math.max(self._scale.Scale * scale.Scale, 0.01)
+			slot.Size = UDim2.new(1, 0, 0, math.max(64, math.ceil(51 + height - 0.01)))
+		end
+		maid:Give(body:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitContent))
+		task.defer(fitContent)
+		local close = Util.button({
+			Name = "Dismiss", AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0),
+			Size = UDim2.fromOffset(16, 16), ZIndex = 6, Parent = card,
+		})
+		Util.corner(close, 6)
+		theme:Bind(close, { BackgroundColor3 = "Hover" })
+		local closeIcon = Icons.create("close", 10, theme.Tokens.TextMuted, {
+			AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), ZIndex = 6, Parent = close,
+		})
 		local track = Util.frame({
-			Name = "Progress",
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(0, -6, 1, 9),
-			Size = UDim2.new(1, 6, 0, 2),
-			BackgroundTransparency = 1,
-			Parent = card,
+			Name = "Progress", AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.new(0, 40, 1, 9), Size = UDim2.new(1, -40, 0, 2),
+			BackgroundTransparency = 0.75, ZIndex = 2, Parent = card,
 		})
+		Util.corner(track, 2)
+		theme:Bind(track, { BackgroundColor3 = "BorderStrong" })
 		local bar = Util.frame({
-			Size = UDim2.fromScale(1, 1),
-			BackgroundTransparency = 1,
-			Parent = track,
+			Name = "Remaining", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 0.08, ZIndex = 3, Parent = track,
 		})
-		Util.corner(bar, 1)
+		Util.corner(bar, 2)
 		theme:Bind(bar, { BackgroundColor3 = kind.token })
-
-		local toast = { Dismissed = false }
+		Util.new("UIGradient", {
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.32), NumberSequenceKeypoint.new(1, 0) }), Parent = bar,
+		})
+		toast = { Dismissed = false, Hovered = false, Remaining = duration, Card = card, Bar = bar }
 		table.insert(self._toasts, toast)
-
-		-- Enter
-		Motion.tween(card, "Smooth", { Position = UDim2.fromOffset(0, 0), BackgroundTransparency = 0.02 })
-		Motion.tween(stroke, "Smooth", { Transparency = 0.25 })
-		Motion.tween(title, "Smooth", { TextTransparency = 0 })
-		Motion.tween(body, "Smooth", { TextTransparency = 0 })
-		Motion.tween(accent, "Smooth", { BackgroundTransparency = 0 })
-		Motion.tween(bar, "Smooth", { BackgroundTransparency = 0.35 })
-		Icons.tween(icon, "Smooth", theme:Get(kind.token), 0)
-		local timer = Motion.timer(bar, duration, { Size = UDim2.fromScale(0, 1) })
+		Motion.tween(card, "Smooth", { Position = UDim2.new(), GroupTransparency = 0 })
+		Motion.tween(scale, "Pop", { Scale = 1 })
 
 		function toast.Dismiss()
-			if toast.Dismissed then
-				return
-			end
+			if toast.Dismissed then return end
 			toast.Dismissed = true
-			timer:Cancel()
-			local index = table.find(self._toasts, toast)
-			if index then
-				table.remove(self._toasts, index)
-			end
+			maid:Clean()
 			local height = slot.AbsoluteSize.Y / math.max(self._scale.Scale, 0.01)
 			slot.AutomaticSize = Enum.AutomaticSize.None
 			slot.Size = UDim2.new(1, 0, 0, height)
 			slot.ClipsDescendants = true
-			Motion.tween(card, "Normal", { Position = UDim2.fromOffset(36, 0), BackgroundTransparency = 1 })
-			Motion.tween(stroke, "Normal", { Transparency = 1 })
-			Motion.tween(title, "Fast", { TextTransparency = 1 })
-			Motion.tween(body, "Fast", { TextTransparency = 1 })
-			Motion.tween(accent, "Fast", { BackgroundTransparency = 1 })
-			Motion.tween(bar, "Fast", { BackgroundTransparency = 1 })
-			Icons.tween(icon, "Fast", theme:Get(kind.token), 1)
+			Motion.tween(card, "Normal", { Position = UDim2.fromOffset(20, 0), GroupTransparency = 1 })
+			Motion.tween(scale, "Normal", { Scale = 0.96 })
 			Motion.tween(slot, "Normal", { Size = UDim2.new(1, 0, 0, 0) })
-			task.delay(Motion.info("Normal").Time + 0.05, function()
-				slot:Destroy()
-			end)
+			task.delay(Motion.info("Normal").Time + 0.02, function() slot:Destroy() end)
 		end
-
-		card.Activated:Connect(toast.Dismiss)
-		task.delay(duration, toast.Dismiss)
-
-		if ctx.NotifySound and opts.Silent ~= true then
-			ctx.NotifySound()
-		end
+		maid:Give(card.MouseEnter:Connect(function()
+			toast.Hovered = true
+			Motion.tween(stroke, "Fast", { Transparency = 0.25 })
+		end))
+		maid:Give(card.MouseLeave:Connect(function()
+			toast.Hovered = false
+			Motion.tween(stroke, "Fast", { Transparency = 0.45 })
+		end))
+		maid:Give(close.MouseEnter:Connect(function()
+			Motion.tween(close, "Fast", { BackgroundTransparency = 0.25 })
+			Icons.tween(closeIcon, "Fast", theme.Tokens.Text)
+		end))
+		maid:Give(close.MouseLeave:Connect(function()
+			Motion.tween(close, "Fast", { BackgroundTransparency = 1 })
+			Icons.tween(closeIcon, "Fast", theme.Tokens.TextMuted)
+		end))
+		maid:Give(close.Activated:Connect(toast.Dismiss))
+		maid:Give(RunService.Heartbeat:Connect(function(dt)
+			if not ctx.Gui.Enabled or (ctx.IsInterfaceVisible and not ctx.IsInterfaceVisible()) then
+				toast.Hovered = false
+				return
+			end
+			if toast.Hovered then return end
+			toast.Remaining = math.max(0, toast.Remaining - dt)
+			bar.Size = UDim2.fromScale(toast.Remaining / duration, 1)
+			if toast.Remaining <= 0 then toast.Dismiss() end
+		end))
+		maid:Give(function()
+			toast.Dismissed = true
+			local index = table.find(self._toasts, toast)
+			if index then table.remove(self._toasts, index) end
+		end)
+		if ctx.NotifySound and opts.Silent ~= true then ctx.NotifySound() end
 		return toast
 	end
 
@@ -5715,7 +5708,7 @@ __modules["Nocturne"] = function(script, require)
 	end
 
 	function Tab:IsOpen()
-		return self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
+		return self.Window.App._interfaceVisible and self.Window.App.Gui.Enabled and self.Page.Window.IsOpen
 			and (self.Page == self.Page.RootPage or self.Page.Window.Current == self.Page)
 	end
 
@@ -6317,6 +6310,7 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 		})
 		self.Surface, self.Holder = surface, surface.Holder
 		self.Scale = Util.new("UIScale", { Parent = surface.Holder })
+		self.BodyScale = Util.new("UIScale", { Parent = surface.Body })
 
 		-- Highlight pill that slides to the active icon.
 		local indicator = Util.frame({
@@ -6392,6 +6386,7 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 		surface.Holder.Position = UDim2.new(0.5, 0, 0, TOP - 14)
 		surface.SetAlpha(1, "Instant")
 		task.defer(function()
+			if ctx.IsInterfaceVisible and not ctx.IsInterfaceVisible() then return end
 			Motion.tween(surface.Holder, "Slow", { Position = UDim2.new(0.5, 0, 0, TOP) })
 			surface.SetAlpha(0, "Slow")
 		end)
@@ -6400,6 +6395,13 @@ __modules["Nocturne.Navigation.Toolbar"] = function(script, require)
 
 	function Toolbar:Bottom()
 		return (TOP + BUTTON + PAD * 2) * self.Scale.Scale
+	end
+
+	function Toolbar:SetPresented(shown)
+		self:_hideHint()
+		Motion.tween(self.Holder, "Normal", { Position = UDim2.new(0.5, 0, 0, shown and TOP or TOP - 6) })
+		Motion.tween(self.BodyScale, shown and "Pop" or "Normal", { Scale = shown and 1 or 0.88 })
+		self.Surface.SetAlpha(shown and 0 or 1, shown and "Smooth" or "Normal")
 	end
 
 	function Toolbar:SetScale(scale)
@@ -7160,6 +7162,12 @@ __modules["Nocturne.Navigation.Window"] = function(script, require)
 	end
 
 	-- Open / close / minimise --------------------------------------------------
+
+	function Window:SetPresented(shown)
+		if not self.IsOpen then return end
+		Motion.tween(self.BodyScale, shown and "Pop" or "Normal", { Scale = shown and 1 or 0.94 })
+		self.Surface.SetAlpha(shown and 0 or 1, shown and "Smooth" or "Normal")
+	end
 
 	function Window:Open()
 		if self.IsOpen then

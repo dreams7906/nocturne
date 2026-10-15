@@ -614,6 +614,12 @@ end
 
 -- Open / close / minimise --------------------------------------------------
 
+function Window:SetPresented(shown)
+	if not self.IsOpen then return end
+	Motion.tween(self.BodyScale, shown and "Pop" or "Normal", { Scale = shown and 1 or 0.94 })
+	self.Surface.SetAlpha(shown and 0 or 1, shown and "Smooth" or "Normal")
+end
+
 function Window:Open()
 	if self.IsOpen then
 		return

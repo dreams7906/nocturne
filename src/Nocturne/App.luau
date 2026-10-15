@@ -126,7 +126,10 @@ function Nocturne.new(options)
 		Opened = Signal.new(),
 		Closed = Signal.new(),
 		_connections = {},
+		_interfaceVisible = true,
+		_visibilityVersion = 0,
 	}, App)
+	ctx.IsInterfaceVisible = function() return self._interfaceVisible end
 
 	self.Toolbar = Toolbar.new(ctx)
 	ctx.ToolbarBottom = function()
@@ -273,7 +276,7 @@ function App:SelectPage(name)
 end
 
 function App:Open(pageName)
-	self.Gui.Enabled = true
+	self:_setInterfaceVisible(true)
 	if pageName then
 		self:SelectPage(pageName)
 	end
@@ -284,27 +287,39 @@ function App:Open(pageName)
 end
 
 function App:Close()
-	self.Gui.Enabled = false
-	self.ctx.Popups:CloseAll()
-	self.ctx.Tooltip:Hide()
-	self:_applyBlur(false)
+	self:_setInterfaceVisible(false)
 end
 
-function App:Toggle()
-	if self.Gui.Enabled then
-		self:Close()
-	else
-		self.Gui.Enabled = true
-		if not self:IsOpen() then
-			self:Open()
-		else
-			self:_applyBlur(true)
+function App:_setInterfaceVisible(shown)
+	if self._interfaceVisible == shown then return end
+	self._interfaceVisible = shown
+	self._visibilityVersion += 1
+	local version = self._visibilityVersion
+	self.ctx.Popups:CloseAll()
+	self.ctx.Tooltip:Hide()
+	if shown then self.Gui.Enabled = true end
+	self.Toolbar:SetPresented(shown)
+	for _, window in ipairs(self.Windows) do
+		window:SetPresented(shown)
+	end
+	self:_applyBlur(shown and self:IsOpen())
+	if not shown then
+		local function finish()
+			if not self._destroyed and version == self._visibilityVersion then
+				self.Gui.Enabled = false
+			end
 		end
+		local duration = Motion.info("Normal").Time
+		if duration <= 0 then finish() else task.delay(duration, finish) end
 	end
 end
 
+function App:Toggle()
+	self:_setInterfaceVisible(not self._interfaceVisible)
+end
+
 function App:IsOpen()
-	if not self.Gui.Enabled then return false end
+	if not self._interfaceVisible or not self.Gui.Enabled then return false end
 	for _, window in ipairs(self.Windows) do
 		if window.IsOpen then return true end
 	end

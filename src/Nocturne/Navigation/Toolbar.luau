@@ -51,6 +51,7 @@ function Toolbar.new(ctx)
 	})
 	self.Surface, self.Holder = surface, surface.Holder
 	self.Scale = Util.new("UIScale", { Parent = surface.Holder })
+	self.BodyScale = Util.new("UIScale", { Parent = surface.Body })
 
 	-- Highlight pill that slides to the active icon.
 	local indicator = Util.frame({
@@ -126,6 +127,7 @@ function Toolbar.new(ctx)
 	surface.Holder.Position = UDim2.new(0.5, 0, 0, TOP - 14)
 	surface.SetAlpha(1, "Instant")
 	task.defer(function()
+		if ctx.IsInterfaceVisible and not ctx.IsInterfaceVisible() then return end
 		Motion.tween(surface.Holder, "Slow", { Position = UDim2.new(0.5, 0, 0, TOP) })
 		surface.SetAlpha(0, "Slow")
 	end)
@@ -134,6 +136,13 @@ end
 
 function Toolbar:Bottom()
 	return (TOP + BUTTON + PAD * 2) * self.Scale.Scale
+end
+
+function Toolbar:SetPresented(shown)
+	self:_hideHint()
+	Motion.tween(self.Holder, "Normal", { Position = UDim2.new(0.5, 0, 0, shown and TOP or TOP - 6) })
+	Motion.tween(self.BodyScale, shown and "Pop" or "Normal", { Scale = shown and 1 or 0.88 })
+	self.Surface.SetAlpha(shown and 0 or 1, shown and "Smooth" or "Normal")
 end
 
 function Toolbar:SetScale(scale)
