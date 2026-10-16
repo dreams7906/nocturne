@@ -13,7 +13,7 @@ Right Ctrl hides and shows the interface. `Example.lua` downloads the library an
 To build your own interface:
 
 ```lua
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/ui.lua"))()
 
 local Window = Library:CreateWindow({ Title = "Nocturne" })
 local Main = Window:AddTab({ Title = "Main", Icon = "settings" })
@@ -27,7 +27,7 @@ Section:AddToggle("ExampleToggle", {
 })
 ```
 
-`Nocturne.lua` returns the library table; call `CreateWindow` to show the UI. The remote loader requires an environment that provides client-side `loadstring` and `game:HttpGet`.
+`ui.lua` returns the library table; call `CreateWindow` to show the UI. The remote loader requires an environment that provides client-side `loadstring` and `game:HttpGet`.
 
 ## Features
 
@@ -49,14 +49,9 @@ Section:AddToggle("ExampleToggle", {
 ## Repository layout
 
 ```
-Example.lua                  full demo; downloads the library automatically
-Nocturne.lua                 single-file library loaded by your scripts
-README.md                    setup and complete API reference
-src/Nocturne/                editable library source
-tools/bundle.py              builds Nocturne.lua and versions Example.lua's loader
-tools/build_icon_assets.py   generates asset mappings from the image manifest
-tools/smoketest/             tests the example's loader and UI behavior
-assets/generated-icons/      active artwork, asset IDs and generation prompts
+ui.lua        complete library source
+Example.lua   full demo; downloads ui.lua automatically
+README.md     usage and API documentation
 ```
 
 ## Window
@@ -144,7 +139,7 @@ Abilities:SelectTab("Advanced")
 - `Side` accepts `"Left"`, `"Right"`, `1` or `2`. If you leave it out, sections alternate between columns.
 - `Section:SetVisible(bool)` hides a whole panel.
 
-**Built-in icons:** `nocturne`, `combat`, `visuals`, `world`, `player`, `settings`, `configs`, `utilities`, `misc`, `resize`, `sparkle`, `palette`, `bell`, `info`, `warning`, `success`, `search`, `keyboard`, `save`, `load`, `copy`, `trash`, `pencil`, `plus`, `check`, `chevron`, `close`, `minimize`, `maximize`. Uploaded image IDs and sprite regions live in `src/Nocturne/Icons/Assets.luau`; fallback shapes live in `Icons.Glyphs`. Both support theme tints and hover animation.
+**Built-in icons:** `nocturne`, `combat`, `visuals`, `world`, `player`, `settings`, `configs`, `utilities`, `misc`, `resize`, `sparkle`, `palette`, `bell`, `info`, `warning`, `success`, `search`, `keyboard`, `save`, `load`, `copy`, `trash`, `pencil`, `plus`, `check`, `chevron`, `close`, `minimize`, `maximize`. Uploaded image IDs, sprite regions and fallback shapes are included in `ui.lua`. Both support theme tints and hover animation.
 
 ## Elements
 
@@ -297,7 +292,7 @@ Library:Toggle()
 
 For anything else, `Library.App` exposes the lower-level app: `SetTransparency(0..0.6)`, `SetGloss(bool)`, `SetBlur(bool)`, `SetScale(n)`, `SetReducedMotion(bool)`, `SetAnimationSpeed(n)`, `SetNotifications({ Enabled, Duration, Position, Sound })`, `SetTooltips(bool)`, `Watermark:SetEnabled(bool)`, `Watermark:SetStyle("Single Row" | "Two Row")` and `KeybindList:SetEnabled(bool)`.
 
-**Theme tokens:** `Backdrop`, `Surface`, `Surface2`, `Hover`, `Elevated`, `Border`, `BorderStrong`, `Text`, `TextDim`, `TextMuted`, `Accent`, `AccentText`, `Success`, `Warning`, `Danger`, `Shadow`. To add a preset, add a table to `src/Nocturne/Themes/Presets.luau` and its name to `Presets.Order`.
+**Theme tokens:** `Backdrop`, `Surface`, `Surface2`, `Hover`, `Elevated`, `Border`, `BorderStrong`, `Text`, `TextDim`, `TextMuted`, `Accent`, `AccentText`, `Success`, `Warning`, `Danger`, `Shadow`. To add a preset, edit the `Presets` table and `Presets.Order` in `ui.lua`.
 
 ## Lifetime
 
@@ -307,29 +302,6 @@ Library:Unload()   -- disconnects input, removes the GUI and blur
 ```
 
 Calling `CreateWindow` again unloads the previous interface and its category windows. Use `AddTab` on the same interface to create windows that coexist.
-
-## Building and testing
-
-```bash
-python tools/bundle.py
-```
-
-If uploaded icon IDs change in `assets/generated-icons/manifest.json`, run `python tools/build_icon_assets.py` before bundling. This generates all 29 asset mappings, including the control-sheet regions.
-
-```bash
-python tools/smoketest/run.py path/to/luau.exe
-```
-
-The smoke test uses the official `luau` CLI ([releases](https://github.com/luau-lang/luau/releases)). It runs the actual `Example.lua` to `Nocturne.lua` download/loadstring chain with mocked HTTP responses, then:
-
-- clicks every dock icon, tab, button and dropdown option
-- drags every slider and types into every text box
-- rebinds keys, including a conflicting key that must be refused
-- checks clamping and step snapping
-- checks independent category windows, full-interface hide/restore, minimize/restore, resize dragging, profile privacy, dynamic section sub-tabs, and exact color-picker cursor positioning at reduced scale with a nonzero GUI inset
-- round-trips configs, cycles all themes, and unloads and recreates the window
-
-It reports Lua errors and fails on broken behaviour. Check rendered visuals in the connected Roblox client.
 
 ## Performance
 
