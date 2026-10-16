@@ -2,13 +2,38 @@
 
 A single-file Luau interface library for Roblox with a charcoal interface: a floating **dock**, independent draggable category windows, two-column sections, and a full set of themed controls.
 
-Run the full example:
+Run the GPO feature example:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Example.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/refs/heads/main/Example.lua"))()
 ```
 
-Right Ctrl hides and shows the interface. `Example.lua` downloads the library and builds the complete demo, including Combat / Bosses. It is also a template you can edit for your own project.
+Right Ctrl hides and shows the dock and open windows. `Example.lua` downloads `ui.lua` and builds the Grand Piece Online hub ported from the supplied Tensen script. Automation starts disabled; choose the features you want after the runtime finishes loading.
+
+Outside the supported GPO places, the example shows a layout preview and keeps game actions disabled. Battle Royale uses its own applicable pages.
+
+## GPO feature layout
+
+Each category opens an independent window. Its inner tabs use text labels, with related controls grouped into sections.
+
+| Category | Inner tabs and features |
+| --- | --- |
+| Farming | Setup, Leveling, Stats: shared combat settings, quest and mob farming, scrolls, Haki, stat allocation |
+| Bosses | Juzo, Mihawk, Roger: automation and individual fight settings |
+| Dungeons | Big Mama: Big Mom and Katakuri fight and dungeon settings |
+| Fishing | Fishing, Selling, Bait, Fruit: fishing, merchant, fish sales, bait crafting, fruit storage |
+| Player | Movement, Protection, Shop |
+| Travel | Teleport, Movement: destinations and tween settings |
+| ESP | Players, Islands, Appearance |
+| Trading | Transfer |
+| Servers | Private Servers |
+| Tools | Performance and session options |
+| World | Visuals: fog, lighting and time settings |
+| Battle Royale | Objects, Combat, Appearance, when applicable |
+
+Native **Configs** and **Settings** remain available. Configs are session-based; export/import JSON to transfer settings between runs. Re-running the example stops its previous workers, disconnects its events and replaces the interface.
+
+The port retains the supplied gameplay routines and their existing WIP labels. The previous UI loader and destructive anti-tamper code were removed. Compilation, both UI construction paths, representative automation callbacks and unload behavior were checked with a headless Roblox mock. Farming and other gameplay still need testing in GPO.
 
 To build your own interface:
 
@@ -50,7 +75,7 @@ Section:AddToggle("ExampleToggle", {
 
 ```
 ui.lua        complete library source
-Example.lua   full demo; downloads ui.lua automatically
+Example.lua   GPO feature hub; downloads ui.lua automatically
 README.md     usage and API documentation
 ```
 
@@ -105,7 +130,7 @@ Combat:SelectTab("Bosses")
 Combat:SelectTab("General") -- return to the category's original controls
 ```
 
-This adds text-only General / Bosses tabs inside the Combat window; no inner-tab icons are needed. The selected label is bold and highlighted. The demo includes this hierarchy and Tracking / Alerts tabs inside its Bosses section.
+This adds text-only General / Bosses tabs inside the Combat window; no inner-tab icons are needed. The selected label is bold and highlighted. The GPO example uses this hierarchy for pages such as Farming → Setup / Leveling / Stats and Bosses → Juzo / Mihawk / Roger.
 
 The built-in tabs are added after your script finishes its setup, so they always sit at the end of the dock.
 
