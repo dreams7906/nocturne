@@ -49,21 +49,10 @@ Section:AddToggle("ExampleToggle", {
 ## Repository layout
 
 ```
-ui.lua           complete library source
-Example.lua      full UI demo; downloads ui.lua automatically
-gposource1.txt   separate GPO project using Nocturne
-README.md        usage and API documentation
+ui.lua        complete library source
+Example.lua   full demo; downloads ui.lua automatically
+README.md     usage and API documentation
 ```
-
-## Separate GPO project
-
-`gposource1.txt` contains the GPO feature port. It loads `ui.lua` separately and does not replace the UI example.
-
-```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/refs/heads/main/gposource1.txt"))()
-```
-
-Farming and other gameplay still need testing in GPO. Outside supported GPO places, this script shows a layout preview.
 
 ## Window
 
