@@ -1,6 +1,6 @@
 --[[
 	Nocturne example
-	Builds six tabs on top of the built-in Configs and Settings tabs and uses
+	Builds demo categories plus the built-in Configs and Settings tabs and uses
 	every element type. Each tab gets an icon on the floating dock.
 
 	Run this file directly. It downloads the library below.
@@ -17,7 +17,7 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local Stats = game:GetService("Stats")
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/ui.lua?v=507d7d5a9211"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/refs/heads/main/ui.lua?v=7dee1cab2743"))()
 local Options = Library.Options
 
 local Window = Library:CreateWindow({
@@ -359,6 +359,42 @@ end)
 Library:OnUnload(function()
 	crosshair:Destroy()
 end)
+
+-- Browse the built-in expansion icons; these buttons only show their icon names.
+local IconGallery = Window:AddTab({ Title = "Icons", Icon = "inventory" })
+local IconSamples = IconGallery:AddSection({
+ Title = "Icon library", Tabs = { "Navigation", "Gameplay", "Progression", "Extras" }, Side = "Left",
+})
+local IconGroups = {
+ { Title = "Navigation", Names = { "travel", "teleport", "map", "home", "boat", "islands", "movement", "servers" } },
+ { Title = "Gameplay", Names = { "bosses", "farming", "fishing", "dungeons", "sword", "shield", "target", "radar" } },
+ { Title = "Progression", Names = { "quests", "inventory", "shop", "stats", "fruit", "trophy", "chest", "rewards" } },
+ { Title = "Extras", Names = { "trading", "tools", "party", "pets", "crown", "automation", "lightning", "code" } },
+}
+for _, group in ipairs(IconGroups) do
+ local section = IconSamples:Tab(group.Title)
+ local function iconButton(name)
+  return {
+   Title = name:sub(1, 1):upper() .. name:sub(2), Icon = name,
+   Callback = function()
+    Library:Notify({ Title = "Icon: " .. name, Content = 'Use Icon = "' .. name .. '" on a category or button.', Type = "Info" })
+   end,
+  }
+ end
+ for index = 1, #group.Names, 2 do
+  section:AddButton(iconButton(group.Names[index])):AddButton(iconButton(group.Names[index + 1]))
+ end
+end
+local IconUsage = IconGallery:AddSection({ Title = "Using icons", Side = "Right" })
+IconUsage:AddParagraph({
+ Title = "32 new icons",
+ Content = 'Use Icon = "travel", Icon = "bosses", or any name shown here. Icons match the theme color automatically.',
+})
+IconUsage:AddParagraph({
+ Title = "Category and button icons",
+ Content = "Add icons to dock categories and buttons. Inner tabs remain text-only so you can add any feature name.",
+})
+IconUsage:AddInfo({ Title = "Files", Value = "SVG + PNG on GitHub" })
 
 -- The Configs and Settings tabs are added automatically after this script.
 return Library

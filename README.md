@@ -5,15 +5,15 @@ A single-file Luau interface library for Roblox with a charcoal interface: a flo
 Run the full example:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Example.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/refs/heads/main/Example.lua"))()
 ```
 
-Right Ctrl hides and shows the interface. `Example.lua` downloads the library and builds the complete demo, including Combat / Bosses. It is also a template you can edit for your own project.
+Right Ctrl hides and shows the interface. `Example.lua` downloads the library and builds the complete demo, including Combat / Bosses. It is also a template you can edit for your own project. The Icons category previews the 32 expansion icons.
 
 To build your own interface:
 
 ```lua
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/ui.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/refs/heads/main/ui.lua"))()
 
 local Window = Library:CreateWindow({ Title = "Nocturne" })
 local Main = Window:AddTab({ Title = "Main", Icon = "settings" })
@@ -52,6 +52,7 @@ Section:AddToggle("ExampleToggle", {
 ui.lua        complete library source
 Example.lua   full demo; downloads ui.lua automatically
 README.md     usage and API documentation
+icons/        SVGs, transparent PNGs, atlas and icon catalogue
 ```
 
 ## Window
@@ -140,6 +141,33 @@ Abilities:SelectTab("Advanced")
 - `Section:SetVisible(bool)` hides a whole panel.
 
 **Built-in icons:** `nocturne`, `combat`, `visuals`, `world`, `player`, `settings`, `configs`, `utilities`, `misc`, `resize`, `sparkle`, `palette`, `bell`, `info`, `warning`, `success`, `search`, `keyboard`, `save`, `load`, `copy`, `trash`, `pencil`, `plus`, `check`, `chevron`, `close`, `minimize`, `maximize`. Uploaded image IDs, sprite regions and fallback shapes are included in `ui.lua`. Both support theme tints and hover animation.
+
+## Expansion icons
+
+![Nocturne expansion icon catalogue](icons/preview.png)
+
+32 additional icons are built into `ui.lua`, using clean Lucide vector artwork with a consistent bold outline. They inherit theme colors and are ready to use by name. Existing uploaded icons remain available.
+
+| Group | Icon names |
+| --- | --- |
+| Navigation | `travel`, `teleport`, `map`, `home`, `boat`, `islands`, `movement`, `servers` |
+| Gameplay | `bosses`, `farming`, `fishing`, `dungeons`, `sword`, `shield`, `target`, `radar` |
+| Progression | `quests`, `inventory`, `shop`, `stats`, `fruit`, `trophy`, `chest`, `rewards` |
+| Extras | `trading`, `tools`, `party`, `pets`, `crown`, `automation`, `lightning`, `code` |
+
+```lua
+local Travel = Window:AddTab({ Title = "Travel", Icon = "travel" })
+local Bosses = Window:AddTab({ Title = "Bosses", Icon = "bosses" })
+Travel:AddSection({ Title = "Destinations" }):AddButton({
+ Title = "Open map", Icon = "map", Callback = function() end,
+})
+```
+
+Short aliases include `boss`, `farm`, `fish`, `trade`, `dungeon`, `server`, `quest`, `pet`, `team`, and `gift`. Inner tabs keep their text-only labels.
+
+The [icon folder](icons) contains individual SVGs and transparent 256px PNGs, a 2048×1024 sprite atlas, and its coordinates in `atlas.json`. The library caches the PNG atlas from this repository when `getcustomasset`/`getsynasset` and file access are available. Matching native vector fallbacks remain visible when image files cannot load. Only one representation is displayed at a time. These expansion icons use local image files rather than Roblox asset IDs.
+
+Artwork is adapted from [Lucide](https://lucide.dev/); its ISC/MIT notices are included in [icons/LICENSE.txt](icons/LICENSE.txt) and `ui.lua`.
 
 ## Elements
 

@@ -1,0 +1,237 @@
+{
+  "sheet": "atlas.png",
+  "width": 2048,
+  "height": 1024,
+  "columns": 8,
+  "rows": 4,
+  "cellSize": 256,
+  "source": "https://github.com/lucide-icons/lucide",
+  "sourceCommit": "7b0196e249ca09ca27c584c497aca9a8cab8a7f5",
+  "strokeWidth": 2.4,
+  "icons": {
+    "travel": {
+      "source": "compass",
+      "x": 0,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "teleport": {
+      "source": "circle-arrow-right",
+      "x": 256,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "map": {
+      "source": "map",
+      "x": 512,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "home": {
+      "source": "house",
+      "x": 768,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "boat": {
+      "source": "sailboat",
+      "x": 1024,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "islands": {
+      "source": "tree-palm",
+      "x": 1280,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "movement": {
+      "source": "footprints",
+      "x": 1536,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "servers": {
+      "source": "server",
+      "x": 1792,
+      "y": 0,
+      "width": 256,
+      "height": 256
+    },
+    "bosses": {
+      "source": "skull",
+      "x": 0,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "farming": {
+      "source": "sprout",
+      "x": 256,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "fishing": {
+      "source": "fishing-rod",
+      "x": 512,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "dungeons": {
+      "source": "castle",
+      "x": 768,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "sword": {
+      "source": "sword",
+      "x": 1024,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "shield": {
+      "source": "shield-check",
+      "x": 1280,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "target": {
+      "source": "crosshair",
+      "x": 1536,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "radar": {
+      "source": "radar",
+      "x": 1792,
+      "y": 256,
+      "width": 256,
+      "height": 256
+    },
+    "quests": {
+      "source": "scroll-text",
+      "x": 0,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "inventory": {
+      "source": "backpack",
+      "x": 256,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "shop": {
+      "source": "shopping-bag",
+      "x": 512,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "stats": {
+      "source": "chart-no-axes-column-increasing",
+      "x": 768,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "fruit": {
+      "source": "apple",
+      "x": 1024,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "trophy": {
+      "source": "trophy",
+      "x": 1280,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "chest": {
+      "source": "package-open",
+      "x": 1536,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "rewards": {
+      "source": "gift",
+      "x": 1792,
+      "y": 512,
+      "width": 256,
+      "height": 256
+    },
+    "trading": {
+      "source": "arrow-left-right",
+      "x": 0,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "tools": {
+      "source": "wrench",
+      "x": 256,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "party": {
+      "source": "users-round",
+      "x": 512,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "pets": {
+      "source": "paw-print",
+      "x": 768,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "crown": {
+      "source": "crown",
+      "x": 1024,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "automation": {
+      "source": "repeat-2",
+      "x": 1280,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "lightning": {
+      "source": "zap",
+      "x": 1536,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    },
+    "code": {
+      "source": "code-xml",
+      "x": 1792,
+      "y": 768,
+      "width": 256,
+      "height": 256
+    }
+  }
+}
