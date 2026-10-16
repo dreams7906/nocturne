@@ -2,7 +2,7 @@
 
 Created with the built-in image-generation tool and uploaded through Roblox Studio MCP `upload_image`. Original transparent PNGs are kept here. `manifest.json` records the returned Roblox asset IDs and the row-major control-sheet mapping.
 
-`navigation-bold.png` covers the Nocturne mark and eight categories in a three-by-three atlas. `controls.png` provides the small UI controls. `window-controls-bold.png` overrides minimize, close and restore with heavier artwork. `resize-rounded.png` overrides its old grip with one rounded corner and no interior marks. The manifest supports explicit pixel regions to center individual glyphs and exclude neighboring artwork at cell boundaries. The loader adjusts those regions to Roblox's decoded image size. Drawn fallbacks remain visible until images load. The original individual navigation images and their IDs are retained as previous assets.
+`navigation-bold.png` covers the Nocturne mark and eight categories in a three-by-three atlas. `controls.png` provides the small UI controls. `window-controls-bold.png` overrides minimize, close and restore with heavier artwork. `resize-rounded.png` overrides its old grip with one rounded corner and no interior marks. The manifest supports explicit pixel regions to center individual glyphs and exclude neighboring artwork at cell boundaries. The loader adjusts those regions to Roblox's decoded image size. Drawn fallbacks remain visible until images load.
 
 To update the Lua mappings after replacing an image and its uploaded ID:
 

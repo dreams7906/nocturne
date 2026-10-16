@@ -10,8 +10,6 @@
 		{"dot", cx, cy, r}                 filled circle
 		{"clip", x, y, w, h, {shapes}}     shapes clipped to a box
 
-	Tools/build_assets.py parses the Glyphs table below to export matching
-	SVG files into Assets/Icons, so keep one shape per line.
 ]]
 
 local Motion = require(script.Parent.Parent.Animations.Motion)

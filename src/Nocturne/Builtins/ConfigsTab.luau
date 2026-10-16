@@ -1,8 +1,7 @@
 --[[
 	Built-in Configs tab
 	Save, load, rename and delete named configs, plus JSON export / import.
-	Uses DataStore persistence when Server/ConfigPersistence is installed,
-	otherwise configs last for the session.
+	Configs last for the session; JSON export / import transfers settings.
 ]]
 
 return function(app)
@@ -84,7 +83,7 @@ return function(app)
 	local countInfo = selected:Info({ Text = "Settings", Value = "-" })
 	local savedInfo = selected:Info({ Text = "Saved", Value = "-" })
 	local sizeInfo = selected:Info({ Text = "Size", Value = "-" })
-	selected:Info({ Text = "Storage", Value = configs.Persistent and "Cloud (DataStore)" or "This session", Accent = true })
+	selected:Info({ Text = "Storage", Value = "This session", Accent = true })
 	details = {
 		update = function(name)
 			local info = name and configs:Info(name)

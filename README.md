@@ -2,9 +2,15 @@
 
 A single-file Luau interface library for Roblox with a charcoal interface: a floating **dock**, independent draggable category windows, two-column sections, and a full set of themed controls.
 
-![Dock](preview/dock.svg)
+Run the full example:
 
-The 29 icons use generated transparent artwork uploaded through Roblox Studio MCP: a bold navigation sheet, a control sheet, and a separate rounded resize corner. Their Roblox asset IDs are bundled into the library. Drawn fallbacks stay visible while an image is loading or awaiting Roblox processing.
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Example.lua"))()
+```
+
+Right Ctrl hides and shows the interface. `Example.lua` downloads the library and builds the complete demo, including Combat / Bosses. It is also a template you can edit for your own project.
+
+To build your own interface:
 
 ```lua
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
@@ -23,14 +29,6 @@ Section:AddToggle("ExampleToggle", {
 
 `Nocturne.lua` returns the library table; call `CreateWindow` to show the UI. The remote loader requires an environment that provides client-side `loadstring` and `game:HttpGet`.
 
-To open the full demo with one line:
-
-```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/RemoteExample.lua"))()
-```
-
-For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)` instead. [`Example.lua`](Example.lua) is the Studio demo; [`RemoteExample.lua`](RemoteExample.lua) is generated from it for remote loading. Both build six tabs and use every element.
-
 ## Features
 
 - **Floating dock.** Each category has an icon and its own window. Open several together, drag them separately, and click an open icon again to close only that window. Dots show every open category; hovering shows its name.
@@ -42,7 +40,7 @@ For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)
 - **Sections** with optional header tabs. One panel can hold several control groups (`Tabs = { "Crosshair", "Color" }`).
 - **Elements:** filled-square toggle or switch, slider with typeable value, dropdown (single or multi-select), text/number input, keybind, color picker (SV square, hue bar, hex, presets), button (same-row and confirm-to-click), label, paragraph, info row and divider.
 - **Keybinds** refuse keys that are already in use (with a notification), cancel with Esc, clear with Backspace, attach to toggles (Toggle or Hold mode) and show in an optional keybind-list overlay.
-- **Built-in Configs tab:** save, load, rename and delete named configs, and export/import as JSON. Configs persist per player when `server/ConfigPersistence.server.lua` is installed; otherwise they last for the session.
+- **Built-in Configs tab:** save, load, rename and delete named configs, and export/import as JSON. Configs last for the session; JSON export/import transfers settings between sessions.
 - **Built-in Settings tab:** 7 theme presets, a custom accent color, window transparency, glossy effects on/off, background blur, UI scale, menu key, tooltips, reduced motion, animation speed, notification options, a watermark (single or two row) and a keybind list.
 - **Polish:** layered soft shadows, top-lit gradients, 1px glass edges, hover/press states on everything, quint easing, and no stacked animations when you click fast.
 - **Notifications:** compact glass cards with a status icon and close button. Hover freezes the countdown and progress bar exactly where they are; leaving resumes the remaining time. Timers also pause while the interface is hidden.
@@ -51,22 +49,14 @@ For Roblox Studio, use `local Library = require(game.ReplicatedStorage.Nocturne)
 ## Repository layout
 
 ```
-Nocturne.lua                 single-file build (what you require)
-Example.lua                  example LocalScript using every element
-README.md
-src/Nocturne/                modular source (Rojo-compatible)
-  init.luau                  public Library API
-  App.luau                   window/dock/overlay wiring
-  Core/ Animations/ Themes/ Icons/ Components/ Navigation/ Overlays/ Config/ Builtins/
-server/ConfigPersistence.server.lua   optional DataStore persistence
-tools/bundle.py              src/ -> Nocturne.lua
-tools/export_assets.py       icons -> assets/icons/*.svg, preview sheets
-tools/smoketest/             headless test that runs Example.lua and clicks everything
-assets/icons/                SVG exports of every built-in icon
-assets/generated-icons/      uploaded PNG artwork, asset IDs and generation prompts
-assets/references/           the reference screenshots the design was based on
-docs/                        design guide, reference notes, installation
-default.project.json         Rojo project (library + server script)
+Example.lua                  full demo; downloads the library automatically
+Nocturne.lua                 single-file library loaded by your scripts
+README.md                    setup and complete API reference
+src/Nocturne/                editable library source
+tools/bundle.py              builds Nocturne.lua and versions Example.lua's loader
+tools/build_icon_assets.py   generates asset mappings from the image manifest
+tools/smoketest/             tests the example's loader and UI behavior
+assets/generated-icons/      active artwork, asset IDs and generation prompts
 ```
 
 ## Window
@@ -293,7 +283,7 @@ Library:ExportConfig()            -- JSON of the current settings
 Library:ImportConfig(json)
 ```
 
-Configs are kept in memory for the session by default. For per-player cloud saves, add `server/ConfigPersistence.server.lua` to ServerScriptService. It creates `ReplicatedStorage.NocturneConfigs` and stores configs with DataStoreService, validating names and sizes and limiting request rate. The Configs tab shows which storage is active.
+Configs are kept in memory for the session. Export the JSON before leaving and import it in a later session to restore those settings.
 
 ## Customization
 
@@ -327,15 +317,10 @@ python tools/bundle.py
 If uploaded icon IDs change in `assets/generated-icons/manifest.json`, run `python tools/build_icon_assets.py` before bundling. This generates all 29 asset mappings, including the control-sheet regions.
 
 ```bash
-python tools/export_assets.py
-```
-
-```bash
 python tools/smoketest/run.py path/to/luau.exe
-python tools/smoketest/run.py path/to/luau.exe --remote
 ```
 
-The smoke test uses the official `luau` CLI ([releases](https://github.com/luau-lang/luau/releases)). It runs the bundled library and `Example.lua` inside a small Roblox mock, then:
+The smoke test uses the official `luau` CLI ([releases](https://github.com/luau-lang/luau/releases)). It runs the actual `Example.lua` to `Nocturne.lua` download/loadstring chain with mocked HTTP responses, then:
 
 - clicks every dock icon, tab, button and dropdown option
 - drags every slider and types into every text box
@@ -344,7 +329,7 @@ The smoke test uses the official `luau` CLI ([releases](https://github.com/luau-
 - checks independent category windows, full-interface hide/restore, minimize/restore, resize dragging, profile privacy, dynamic section sub-tabs, and exact color-picker cursor positioning at reduced scale with a nonzero GUI inset
 - round-trips configs, cycles all themes, and unloads and recreates the window
 
-It reports any Lua error and fails on broken behaviour. It doesn't render anything, so check visuals in Studio.
+It reports Lua errors and fails on broken behaviour. Check rendered visuals in the connected Roblox client.
 
 ## Performance
 

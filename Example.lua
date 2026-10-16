@@ -3,10 +3,8 @@
 	Builds six tabs on top of the built-in Configs and Settings tabs and uses
 	every element type. Each tab gets an icon on the floating dock.
 
-	Setup (Roblox Studio)
-	1. Put Nocturne.lua in ReplicatedStorage as a ModuleScript named "Nocturne".
-	2. Put this file in StarterPlayer > StarterPlayerScripts as a LocalScript.
-	3. Press Play. Right Ctrl toggles the window.
+	Run this file directly. It downloads the library below.
+	Right Ctrl hides or shows the interface.
 
 	To add your own tab later, copy one of the blocks below:
 		local MyTab = Window:AddTab({ Title = "My Tab", Icon = "sparkle" })
@@ -16,11 +14,10 @@
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Stats = game:GetService("Stats")
 
-local Library = require(ReplicatedStorage:WaitForChild("Nocturne"))
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua?v=b3a1554696b2"))()
 local Options = Library.Options
 
 local Window = Library:CreateWindow({
@@ -364,3 +361,4 @@ Library:OnUnload(function()
 end)
 
 -- The Configs and Settings tabs are added automatically after this script.
+return Library

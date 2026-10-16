@@ -32,17 +32,6 @@
     ],
     "file": "controls.png"
   },
-  "previous_assets": {
-    "nocturne": "94383796334112",
-    "combat": "133149767794003",
-    "visuals": "133395560601361",
-    "world": "137930732018683",
-    "player": "132978357840863",
-    "settings": "135452470649058",
-    "configs": "132227538337264",
-    "utilities": "132705411270408",
-    "misc": "71432307544650"
-  },
   "navigation": {
     "file": "navigation-bold.png",
     "columns": 3,

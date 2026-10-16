@@ -2,26 +2,17 @@
 	ConfigManager
 	Saves / loads the values of every flagged control.
 
-	Storage
-	- If ReplicatedStorage has a RemoteFunction named "NocturneConfigs"
-	  (created by Server/ConfigPersistence.server.luau) configs persist per
-	  player through DataStoreService.
-	- Otherwise configs live in memory for the session; export / import
-	  still lets players move them around as JSON text.
-
-	All methods yield when a remote is used; call them from callbacks
-	(already spawned) or task.spawn.
+	Configs live in memory for the session. Export / import transfers
+	settings as JSON text.
 ]]
 
 local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Signal = require(script.Parent.Parent.Core.Signal)
 
 local ConfigManager = {}
 ConfigManager.__index = ConfigManager
 
-local REMOTE_NAME = "NocturneConfigs"
 local MAX_NAME = 32
 local FORMAT = 1
 
@@ -30,26 +21,7 @@ function ConfigManager.new(state)
 		State = state,
 		_store = {}, -- name -> { Data = table, Saved = unix time }
 		Changed = Signal.new(),
-		Persistent = false,
 	}, ConfigManager)
-
-	local remote = ReplicatedStorage:FindFirstChild(REMOTE_NAME)
-	if remote and remote:IsA("RemoteFunction") then
-		self._remote = remote
-		self.Persistent = true
-		task.spawn(function()
-			local ok, result = pcall(remote.InvokeServer, remote, "fetch")
-			if ok and type(result) == "table" then
-				for name, json in pairs(result) do
-					local decoded = self:_decode(json)
-					if decoded then
-						self._store[name] = decoded
-					end
-				end
-				self.Changed:Fire()
-			end
-		end)
-	end
 	return self
 end
 
@@ -75,14 +47,6 @@ end
 
 function ConfigManager:_encode(entry)
 	return HttpService:JSONEncode({ Format = FORMAT, Saved = entry.Saved, Flags = entry.Data })
-end
-
-function ConfigManager:_push(action, name, json)
-	if not self._remote then
-		return true
-	end
-	local ok, result = pcall(self._remote.InvokeServer, self._remote, action, name, json)
-	return ok and result == true, ok and result or "Storage unavailable"
 end
 
 function ConfigManager:List()
@@ -115,10 +79,6 @@ function ConfigManager:Save(name)
 		return false, "Enter a config name first."
 	end
 	local entry = { Data = self.State:Serialize(), Saved = os.time() }
-	local ok, err = self:_push("save", name, self:_encode(entry))
-	if not ok then
-		return false, tostring(err)
-	end
 	self._store[name] = entry
 	self.Changed:Fire()
 	return true, ("Saved '%s'."):format(name)
@@ -137,10 +97,6 @@ function ConfigManager:Delete(name)
 	if not self._store[name] then
 		return false, "Select a config to delete."
 	end
-	local ok, err = self:_push("delete", name)
-	if not ok then
-		return false, tostring(err)
-	end
 	self._store[name] = nil
 	self.Changed:Fire()
 	return true, ("Deleted '%s'."):format(name)
@@ -156,11 +112,6 @@ function ConfigManager:Rename(old, new)
 		return false, ("'%s' already exists."):format(new)
 	end
 	local entry = self._store[old]
-	local ok, err = self:_push("save", new, self:_encode(entry))
-	if not ok then
-		return false, tostring(err)
-	end
-	self:_push("delete", old)
 	self._store[new] = entry
 	self._store[old] = nil
 	self.Changed:Fire()

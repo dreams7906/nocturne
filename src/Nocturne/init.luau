@@ -1,7 +1,7 @@
 --[[
 	Nocturne · dark glass interface library for Roblox
 
-	local Library = require(ReplicatedStorage.Nocturne)
+	local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/dreams7906/nocturne/main/Nocturne.lua"))()
 
 	local Window = Library:CreateWindow({ Title = "Nocturne", SubTitle = "My Game" })
 	local Main = Window:AddTab({ Title = "Main", Icon = "combat" })
